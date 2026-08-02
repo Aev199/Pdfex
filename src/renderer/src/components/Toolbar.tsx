@@ -1,5 +1,6 @@
 import { isWeb } from '../platform/web/install'
 import { useGitHubStars } from '../app/useGitHubStars'
+import { FeatureHeaderActions } from '../features/HeaderActions'
 import { BoltIcon, GitHubIcon } from './icons'
 
 interface ToolbarProps {
@@ -89,6 +90,7 @@ export function Toolbar({
       <button className="btn glass" onClick={onExportZip} disabled={busy || documentCount === 0}>
         Export ZIP
       </button>
+      <FeatureHeaderActions />
       {isWeb && (
         <a
           className="btn glass"
