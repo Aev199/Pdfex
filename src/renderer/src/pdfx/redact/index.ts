@@ -14,6 +14,7 @@ import {
 } from './page-resources'
 import { scrubContent } from './scrub'
 import type { ScrubOptions } from './scrub'
+import { sourceBytes } from '../source'
 
 class Unsupported extends Error {}
 
@@ -47,7 +48,7 @@ async function attempt(
   filledBytes: Uint8Array | undefined,
   options: RedactPageOptions
 ): Promise<SourceExportPage | null> {
-  const source = await PDFDocument.load(filledBytes ?? entry.source.bytes, {
+  const source = await PDFDocument.load(filledBytes ?? (await sourceBytes(entry.source)), {
     ignoreEncryption: true
   })
   const temp = await PDFDocument.create()

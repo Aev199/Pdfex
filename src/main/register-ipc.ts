@@ -6,6 +6,7 @@ import { markupToPdf } from './markup'
 import { OpenedFile, IMPORTABLE, readFiles, expandDropPaths } from './file-intake'
 import { clipboardFilePaths } from './clipboard'
 import { readResource } from './resource'
+import { readSource, statSource } from './source-files'
 import { getMainWindow, setRendererReady, sendOpenPaths } from './window'
 
 const MAX_WRITE_BYTES = 1024 * 1024 * 1024 // 1 GiB cap on a single IPC write
@@ -48,6 +49,12 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
     'pdfx:expand-drop-paths',
     async (_event, paths: string[]): Promise<OpenedFile[]> =>
       readFiles(await expandDropPaths(paths))
+  )
+
+  ipcMain.handle('pdfx:read-source', (_event, path: unknown) => readSource(path))
+
+  ipcMain.handle('pdfx:stat-sources', (_event, paths: unknown) =>
+    Array.isArray(paths) ? Promise.all(paths.slice(0, 10_000).map(statSource)) : []
   )
 
   ipcMain.handle('pdfx:read-resource', (_event, htmlPath: string, ref: string) =>

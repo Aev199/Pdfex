@@ -17,6 +17,8 @@ export function createWebApi(): PdfxApi {
     clearClipboard,
     getPathForFile: () => '',
     expandDropPaths: async () => [],
+    readSource: async () => null,
+    statSources: async (paths) => paths.map(() => null),
     readResource: async () => null,
     markupToPdf,
     writeFile,

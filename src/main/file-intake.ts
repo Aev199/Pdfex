@@ -1,11 +1,16 @@
 import { basename, join } from 'path'
 import { existsSync } from 'fs'
 import { readFile, readdir, stat } from 'fs/promises'
+import { grantReadPath } from './source-files'
 
 export interface OpenedFile {
   name: string
   data: Uint8Array
   path?: string
+  // Size and modification time when read, so a later re-read can tell
+  // whether the file changed on disk in the meantime.
+  size?: number
+  mtimeMs?: number
 }
 
 export const IMPORTABLE = /\.(pdf|pdfx|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
@@ -16,11 +21,12 @@ export function collectFileArgs(argv: string[]): string[] {
 
 export async function readFiles(paths: string[]): Promise<OpenedFile[]> {
   return Promise.all(
-    paths.map(async (p) => ({
-      name: basename(p),
-      data: new Uint8Array(await readFile(p)),
-      path: p
-    }))
+    paths.map(async (p) => {
+      const info = await stat(p)
+      const data = new Uint8Array(await readFile(p))
+      grantReadPath(p)
+      return { name: basename(p), data, path: p, size: info.size, mtimeMs: info.mtimeMs }
+    })
   )
 }
 

@@ -6,6 +6,7 @@ import { FullView } from './components/FullView'
 import { CollectionCanvas } from './components/CollectionCanvas'
 import type { CanvasHandle } from './components/Canvas'
 import { useCollection } from './app/useCollection'
+import { createZoomStore } from './app/zoom-store'
 import { useFullView } from './app/useFullView'
 import { useMarks } from './app/useMarks'
 import { useFormValues } from './app/useFormValues'
@@ -34,7 +35,9 @@ const TOAST_MS = 4000
 
 export default function App(): React.JSX.Element {
   const [busy, setBusy] = useState(false)
-  const [scale, setScale] = useState(1)
+  // Zoom ticks arrive ~11x/s while zooming; keep them out of App state so
+  // only the toolbar's percentage re-renders.
+  const zoomStore = useMemo(createZoomStore, [])
   const [renderVersion, setRenderVersion] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -149,7 +152,7 @@ export default function App(): React.JSX.Element {
     onCloseFind: find.closeFind
   })
 
-  const onScaleChange = useCallback((next: number) => setScale(next), [])
+  const onScaleChange = useCallback((next: number) => zoomStore.set(next), [zoomStore])
   const onSettle = useCallback(() => setRenderVersion((v) => v + 1), [])
 
   const fullViewRef = fullViewState.fullViewRef
@@ -191,7 +194,7 @@ export default function App(): React.JSX.Element {
             documentCount={docs.length}
             pageCount={totalPages}
             busy={busy}
-            zoom={scale}
+            zoomStore={zoomStore}
             aiOpen={aiOpen}
             aiEnabled={aiEnabled}
             onZoomIn={() => canvasRef.current?.zoomIn()}

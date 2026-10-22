@@ -1,5 +1,5 @@
 import { findConverter } from '../pdfx/convert'
-import { importIntoDocs, loadSource, pagesFromSource } from '../pdfx/source'
+import { fileMeta, importIntoDocs, loadSource, pagesFromSource } from '../pdfx/source'
 import { partitionPages, readManifest, stripExtension } from '../pdfx/format'
 import type { DocEntry, PageEntry } from '../types'
 import type { DropTarget } from '../canvas/layout'
@@ -31,7 +31,7 @@ async function dropSingleFileInto(
       { width: ref.width, height: ref.height },
       file.path
     )
-    const { source, sizes } = await loadSource(bytes)
+    const { source, sizes } = await loadSource(bytes, fileMeta(file, true))
     const pages = pagesFromSource(
       source,
       sizes,
@@ -40,7 +40,7 @@ async function dropSingleFileInto(
     deps.insertPagesIntoDoc(target.docId, target.index, pages)
     return
   }
-  const { source, sizes } = await loadSource(file.data)
+  const { source, sizes } = await loadSource(file.data, fileMeta(file, false))
   const manifest = await readManifest(source.pdf)
   const parts = partitionPages(manifest, source.pdf.numPages, stripExtension(file.name))
   if (parts.length > 1) {
@@ -71,7 +71,7 @@ async function dropFilesAsNewDocs(
     const conv = findConverter(file.name, file.data)
     const name = conv ? conv.rename(file.name) : file.name
     const data = conv ? await conv.toPdf(file.name, file.data, undefined, file.path) : file.data
-    newDocs.push(...(await importIntoDocs(name, data)))
+    newDocs.push(...(await importIntoDocs(name, data, fileMeta(file, !!conv))))
   }
   deps.spliceDocsAfter(anchorDocId, newDocs)
 }

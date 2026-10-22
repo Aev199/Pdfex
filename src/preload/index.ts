@@ -4,6 +4,13 @@ export interface OpenedFile {
   name: string
   data: Uint8Array
   path?: string
+  size?: number
+  mtimeMs?: number
+}
+
+export interface FileStamp {
+  size: number
+  mtimeMs: number
 }
 
 export type ZoomAction = 'in' | 'out' | 'reset'
@@ -27,6 +34,11 @@ const api = {
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   expandDropPaths: (paths: string[]): Promise<OpenedFile[]> =>
     ipcRenderer.invoke('pdfx:expand-drop-paths', paths),
+  // Re-read a file the user opened earlier (null if moved, deleted or never opened).
+  readSource: (path: string): Promise<(FileStamp & { data: Uint8Array }) | null> =>
+    ipcRenderer.invoke('pdfx:read-source', path),
+  statSources: (paths: string[]): Promise<(FileStamp | null)[]> =>
+    ipcRenderer.invoke('pdfx:stat-sources', paths),
   readResource: (
     htmlPath: string,
     ref: string

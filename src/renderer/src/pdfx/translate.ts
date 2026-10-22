@@ -10,6 +10,7 @@ import { createFontPicker } from './translate-fonts'
 import { fitSegments } from './translate-fit'
 import type { FitContext, FitInput, FittedSegment } from './translate-fit'
 import { buildOccupancy } from './translate-occupancy'
+import { sourceBytes } from './source'
 
 const COVER_COLOR = rgb(1, 1, 1)
 
@@ -25,7 +26,7 @@ interface ScrubbedPage {
 }
 
 async function copySinglePage(entry: PageEntry): Promise<PDFDocument> {
-  const source = await PDFDocument.load(entry.source.bytes, { ignoreEncryption: true })
+  const source = await PDFDocument.load(await sourceBytes(entry.source), { ignoreEncryption: true })
   const temp = await PDFDocument.create()
   const [page] = await temp.copyPages(source, [entry.pageIndex])
   temp.addPage(page)

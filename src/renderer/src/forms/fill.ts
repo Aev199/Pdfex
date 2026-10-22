@@ -10,7 +10,8 @@ import {
 import type { PDFField, PDFForm, PDFPage, PDFRef } from 'pdf-lib'
 import { hasAnyValue } from './types'
 import type { FormValues, FormValuesBySource } from './types'
-import type { DocEntry } from '../types'
+import type { DocEntry, PdfSource } from '../types'
+import { sourceBytes } from '../pdfx/source'
 
 type Widget = ReturnType<PDFField['acroField']['getWidgets']>[number]
 
@@ -112,14 +113,15 @@ export async function fillDocSources(
   docs: DocEntry[],
   valuesBySource: FormValuesBySource
 ): Promise<Map<string, Uint8Array>> {
-  const sources = new Map<string, Uint8Array>()
+  const sources = new Map<string, PdfSource>()
   for (const doc of docs) {
-    for (const page of doc.pages) sources.set(page.source.id, page.source.bytes)
+    for (const page of doc.pages) sources.set(page.source.id, page.source)
   }
   const filled = new Map<string, Uint8Array>()
-  for (const [sourceId, bytes] of sources) {
+  for (const [sourceId, source] of sources) {
     const values = valuesBySource[sourceId]
     if (!hasAnyValue(values)) continue
+    const bytes = await sourceBytes(source)
     try {
       filled.set(sourceId, await fillFormValues(bytes, values!))
     } catch (error) {

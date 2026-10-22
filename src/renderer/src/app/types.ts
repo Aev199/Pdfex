@@ -2,6 +2,8 @@ export interface IncomingFile {
   name: string
   data: Uint8Array
   path?: string
+  size?: number
+  mtimeMs?: number
 }
 
 export interface PageRef {

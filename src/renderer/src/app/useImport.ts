@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
 import { findConverter } from '../pdfx/convert'
-import { importIntoDocs, loadIncomingPages } from '../pdfx/source'
+import { fileMeta, importIntoDocs, loadIncomingPages } from '../pdfx/source'
 import { dedupeNames } from './names'
 import { applyExternalDrop } from './external-drop'
 import type { Collection } from './useCollection'
@@ -26,7 +26,7 @@ export function useImport(
           const data = conv
             ? await conv.toPdf(file.name, file.data, undefined, file.path)
             : file.data
-          const entries = await importIntoDocs(name, data)
+          const entries = await importIntoDocs(name, data, fileMeta(file, !!conv))
           setDocs((prev) => [...prev, ...dedupeNames(prev, entries)])
         } catch (error) {
           console.error(`Failed to import ${file.name}`, error)
