@@ -1,4 +1,4 @@
-import { app, nativeTheme, BrowserWindow } from 'electron'
+import { app, dialog, nativeTheme, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -8,14 +8,13 @@ import { createWindow, getMainWindow, getRendererReady, sendOpenPaths } from './
 import { buildMenu } from './menu'
 import { registerIpc } from './register-ipc'
 import { registerAssetProtocol, registerAssetSchemePrivileged } from './assets'
+import { configureDataLocation } from './portable'
 
 app.setName('PDFx')
 
 registerAssetSchemePrivileged()
 
-if (process.env.PDFX_USER_DATA) {
-  app.setPath('userData', process.env.PDFX_USER_DATA)
-}
+const dataLocation = configureDataLocation()
 
 let pendingOpenPaths: string[] = []
 
@@ -68,6 +67,15 @@ if (!gotLock) {
 
     buildMenu()
     createWindow()
+
+    if (dataLocation.kind === 'fallback') {
+      void dialog.showMessageBox({
+        type: 'warning',
+        title: 'PDFx',
+        message: 'The data folder next to the program is not writable.',
+        detail: `Settings and sessions are kept in ${dataLocation.path} instead.\n\nWanted: ${dataLocation.wanted}`
+      })
+    }
 
     if (process.platform !== 'darwin') {
       nativeTheme.on('updated', () => {

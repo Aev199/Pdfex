@@ -11,6 +11,7 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "yarn typecheck:node && yarn typecheck:web",
+    "test": "vitest run",
     "build:native": "node scripts/build-native.mjs",
     "start": "electron-vite preview",
     "dev": "electron-vite dev --watch",
@@ -38,6 +39,7 @@
     "@tesseract.js-data/deu": "1.0.0",
     "@tesseract.js-data/eng": "1.0.0",
     "@tesseract.js-data/fra": "1.0.0",
+    "@tesseract.js-data/rus": "1.0.0",
     "@tesseract.js-data/spa": "1.0.0",
     "@types/d3-selection": "3.0.11",
     "@types/d3-zoom": "3.0.8",
@@ -65,6 +67,7 @@
     "tesseract.js-core": "7.0.0",
     "typescript": "5.9.3",
     "vite": "7.3.5",
+    "vitest": "3.2.4",
     "zod": "4.4.3"
   }
 }

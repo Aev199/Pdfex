@@ -1,0 +1,39 @@
+name: Windows Portable
+
+# The full Windows build is slow; run it on demand, for release tags and for
+# pull requests into main — not on every push.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  portable:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn typecheck
+      - run: yarn test
+      - run: yarn electron-vite build
+      - run: yarn electron-builder --win --publish never
+      - run: node scripts/verify-portable.mjs dist/win-unpacked
+      - name: Smoke-launch pdfx.exe
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist/win-unpacked/pdfx.exe -PassThru
+          Start-Sleep -Seconds 15
+          if ($p.HasExited) { throw "pdfx.exe exited early with code $($p.ExitCode)" }
+          if (-not (Test-Path dist/win-unpacked/data)) { throw "data folder was not created next to pdfx.exe" }
+          Stop-Process -Id $p.Id -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PDFx-Windows-Portable
+          path: dist/PDFx-Windows-Portable.zip
+          if-no-files-found: error
