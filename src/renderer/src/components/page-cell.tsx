@@ -12,6 +12,7 @@ import { MarkLayer } from './MarkLayer'
 import { ElementsLayer } from './elements/ElementsLayer'
 import { FormLayer } from './forms/FormLayer'
 import { buildPageDragImage } from './page-drag-image'
+import type { SelectModifiers } from '../app/useCollection'
 
 interface PageCellProps {
   docId: string
@@ -29,7 +30,8 @@ interface PageCellProps {
   elements: PageElement[] | undefined
   pagesDraggable: boolean
   visibleNumber: number
-  onSelectPage: (docId: string, pageId: string) => void
+  onSelectPage: (docId: string, pageId: string, modifiers?: SelectModifiers) => void
+  onPageContextMenu: (docId: string, pageId: string, x: number, y: number) => void
   onOpenPage: (docId: string, pageId: string) => void
   onPageDragStart: (docId: string, pageId: string) => void
   onPageDragEnd: () => void
@@ -52,6 +54,7 @@ function PageCellImpl({
   pagesDraggable,
   visibleNumber,
   onSelectPage,
+  onPageContextMenu,
   onOpenPage,
   onPageDragStart,
   onPageDragEnd
@@ -86,7 +89,12 @@ function PageCellImpl({
       draggable={pagesDraggable}
       onClick={(e) => {
         e.stopPropagation()
-        onSelectPage(docId, page.id)
+        onSelectPage(docId, page.id, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey })
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onPageContextMenu(docId, page.id, e.clientX, e.clientY)
       }}
       onDoubleClick={(e) => {
         e.stopPropagation()

@@ -1,4 +1,4 @@
-import { basename, join } from 'path'
+import { basename, join, resolve } from 'path'
 import { existsSync } from 'fs'
 import { readFile, readdir, stat } from 'fs/promises'
 import { grantReadPath } from './source-files'
@@ -15,8 +15,13 @@ export interface OpenedFile {
 
 export const IMPORTABLE = /\.(pdf|pdfx|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
 
-export function collectFileArgs(argv: string[]): string[] {
-  return argv.filter((arg) => /\.(pdf|pdfx)$/i.test(arg) && existsSync(arg))
+// PDFs named on a command line, made absolute against the directory that
+// command ran in (a second launch's cwd differs from ours).
+export function collectFileArgs(argv: string[], cwd = process.cwd()): string[] {
+  return argv
+    .filter((arg) => /\.(pdf|pdfx)$/i.test(arg))
+    .map((arg) => resolve(cwd, arg))
+    .filter((path) => existsSync(path))
 }
 
 export async function readFiles(paths: string[]): Promise<OpenedFile[]> {

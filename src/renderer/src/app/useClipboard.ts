@@ -1,7 +1,10 @@
-import { useCallback, useRef } from 'react'
+import { useCallback } from 'react'
 import { insertPastedPage } from './doc-ops/pages'
 import type { PageRef } from './types'
 import type { DocEntry, PageEntry } from '../types'
+
+// Shared by every workspace, so a page copied in one tab pastes into another.
+const clipboardRef: { current: PageEntry | null } = { current: null }
 
 export function useClipboard(
   docs: DocEntry[],
@@ -10,7 +13,6 @@ export function useClipboard(
   setSelected: (sel: PageRef | null) => void,
   flash: (message: string) => void
 ) {
-  const clipboardRef = useRef<PageEntry | null>(null)
 
   const copySelected = useCallback(() => {
     if (!selected) return

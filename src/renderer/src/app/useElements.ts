@@ -9,11 +9,15 @@ import type { TextSpan } from '../elements/text-marks'
 import { ACTIONS } from './undo'
 import type { ElementUndoEntry, UndoEntry } from './undo'
 
-export function useElements(pushUndo: (entry: UndoEntry) => void) {
-  const [elements, setElements] = useState<ElementMap>({})
+export function useElements(
+  pushUndo: (entry: UndoEntry) => void,
+  initial: ElementMap = {},
+  initialNextNumber = 1
+) {
+  const [elements, setElements] = useState<ElementMap>(initial)
   const elementsRef = useRef(elements)
   elementsRef.current = elements
-  const nextNumberRef = useRef(1)
+  const nextNumberRef = useRef(initialNextNumber)
 
   const addElement = useCallback(
     (pageId: string, element: PageElement | null): PageElement | null => {
@@ -154,8 +158,24 @@ export function useElements(pushUndo: (entry: UndoEntry) => void) {
     [applyEntry]
   )
 
+  // Give duplicated pages (new id -> original id) the elements of their originals.
+  const copyToPages = useCallback((origins: Map<string, string>) => {
+    const map = elementsRef.current
+    let next: ElementMap | null = null
+    for (const [copyId, originId] of origins) {
+      const list = map[originId]
+      if (!list?.length) continue
+      next ??= { ...map }
+      next[copyId] = list.map((e) => ({ ...e, id: crypto.randomUUID() }))
+    }
+    if (next) setElements(next)
+  }, [])
+
   return {
     elements,
+    elementsRef,
+    copyToPages,
+    nextNumberRef,
     addInk,
     addText,
     addTexts,

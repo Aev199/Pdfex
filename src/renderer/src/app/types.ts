@@ -6,6 +6,13 @@ export interface IncomingFile {
   mtimeMs?: number
 }
 
+// A file still being read or converted; shown as a placeholder row.
+export interface PendingImport {
+  id: string
+  name: string
+  pageCount: number | null
+}
+
 export interface PageRef {
   docId: string
   pageId: string

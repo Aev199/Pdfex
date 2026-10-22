@@ -37,6 +37,18 @@ export async function statSource(path: unknown): Promise<FileStamp | null> {
   }
 }
 
+export async function fileInfo(
+  path: unknown
+): Promise<{ size: number; createdMs: number; modifiedMs: number } | null> {
+  if (!isGranted(path)) return null
+  try {
+    const info = await stat(path)
+    return { size: info.size, createdMs: info.birthtimeMs, modifiedMs: info.mtimeMs }
+  } catch {
+    return null
+  }
+}
+
 export async function readSource(path: unknown): Promise<SourceRead | null> {
   const stamp = await statSource(path)
   if (!stamp) return null

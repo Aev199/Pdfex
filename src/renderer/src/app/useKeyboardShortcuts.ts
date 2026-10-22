@@ -4,7 +4,9 @@ import type { PageRef } from './types'
 interface KeyboardShortcutDeps {
   active: boolean
   selected: PageRef | null
-  onDeletePage: (target: PageRef) => void
+  onDeleteSelection: () => void
+  onDuplicate: () => void
+  onSelectAll: () => void
   onCopy: () => void
   onPaste: () => void
   onUndo: () => void
@@ -23,7 +25,9 @@ function isEditableTarget(target: EventTarget | null): boolean {
 export function useKeyboardShortcuts({
   active,
   selected,
-  onDeletePage,
+  onDeleteSelection,
+  onDuplicate,
+  onSelectAll,
   onCopy,
   onPaste,
   onUndo,
@@ -36,14 +40,16 @@ export function useKeyboardShortcuts({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const mod = event.metaKey || event.ctrlKey
-      if (mod && event.key.toLowerCase() === 'f' && !isEditableTarget(event.target)) {
+      const key = event.key.toLowerCase()
+      if (mod && key === 'f' && !isEditableTarget(event.target)) {
         event.preventDefault()
         onOpenFind()
         return
       }
-      if (mod && event.key.toLowerCase() === 'z' && !isEditableTarget(event.target)) {
+      // Ctrl+Z / Ctrl+Shift+Z, and Ctrl+Y as Windows users expect.
+      if (mod && (key === 'z' || key === 'y') && !isEditableTarget(event.target)) {
         event.preventDefault()
-        if (event.shiftKey) onRedo()
+        if (key === 'y' || event.shiftKey) onRedo()
         else onUndo()
         return
       }
@@ -55,10 +61,16 @@ export function useKeyboardShortcuts({
       if (!active || isEditableTarget(event.target)) return
       if ((event.key === 'Backspace' || event.key === 'Delete') && selected) {
         event.preventDefault()
-        onDeletePage(selected)
-      } else if (mod && event.key.toLowerCase() === 'c' && selected) {
+        onDeleteSelection()
+      } else if (mod && key === 'a') {
+        event.preventDefault()
+        onSelectAll()
+      } else if (mod && key === 'd' && selected) {
+        event.preventDefault()
+        onDuplicate()
+      } else if (mod && key === 'c' && selected) {
         onCopy()
-      } else if (mod && event.key.toLowerCase() === 'v') {
+      } else if (mod && key === 'v') {
         onPaste()
       } else if (event.key === 'Escape') {
         onClearSelection()
@@ -69,7 +81,9 @@ export function useKeyboardShortcuts({
   }, [
     active,
     selected,
-    onDeletePage,
+    onDeleteSelection,
+    onDuplicate,
+    onSelectAll,
     onCopy,
     onPaste,
     onUndo,

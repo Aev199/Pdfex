@@ -40,6 +40,12 @@ export function createCanvasHandle({
       animatorRef.current?.stop()
       zoomRef.current.transform(select(vp), fitTransform())
     },
+    getView() {
+      const vp = viewportRef.current
+      if (!vp) return null
+      const t = zoomTransform(vp)
+      return { x: t.x, y: t.y, k: t.k }
+    },
     clientToWorld(clientX, clientY) {
       const vp = viewportRef.current
       if (!vp) return null

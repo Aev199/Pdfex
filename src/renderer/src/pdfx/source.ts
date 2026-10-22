@@ -32,6 +32,8 @@ export interface SourceMeta {
   pristine?: boolean
   // Reuse a stored id (session restore).
   id?: string
+  // Called as soon as the page count is known, before page sizes are read.
+  onPageCount?: (count: number) => void
 }
 
 // Where an opened file's bytes came from, for loadSource.
@@ -49,6 +51,7 @@ export async function loadSource(bytes: Uint8Array, meta?: SourceMeta): Promise<
   if (pdf.numPages > MAX_PAGES) {
     throw new Error(`PDF declares ${pdf.numPages} pages; refusing to load more than ${MAX_PAGES}`)
   }
+  meta?.onPageCount?.(pdf.numPages)
   const reReadable = !!(meta?.pristine && meta.path && !isWeb)
   const source: PdfSource = {
     id: meta?.id ?? crypto.randomUUID(),

@@ -9,6 +9,7 @@ import { buildMenu } from './menu'
 import { registerIpc } from './register-ipc'
 import { registerAssetProtocol, registerAssetSchemePrivileged } from './assets'
 import { configureDataLocation } from './portable'
+import { cleanupTempExports } from './open-with'
 
 app.setName('PDFx')
 
@@ -31,19 +32,20 @@ const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
-  app.on('second-instance', (_event, argv) => {
+  app.on('second-instance', (_event, argv, workingDirectory) => {
     const mainWindow = getMainWindow()
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
     }
-    void sendOpenPaths(collectFileArgs(argv.slice(1)))
+    void sendOpenPaths(collectFileArgs(argv.slice(1), workingDirectory))
   })
 
   app.whenReady().then(() => {
     electronApp.setAppUserModelId('com.pdfx.app')
 
     registerAssetProtocol()
+    void cleanupTempExports()
 
     nativeTheme.themeSource = 'dark'
 
@@ -90,6 +92,10 @@ if (!gotLock) {
     })
   })
 }
+
+app.on('will-quit', () => {
+  void cleanupTempExports()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

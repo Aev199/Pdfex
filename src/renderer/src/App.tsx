@@ -1,292 +1,226 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
-import { computeLayout } from './canvas/layout'
-import { Toolbar } from './components/Toolbar'
-import { FullView } from './components/FullView'
-import { CollectionCanvas } from './components/CollectionCanvas'
-import type { CanvasHandle } from './components/Canvas'
-import { useCollection } from './app/useCollection'
-import { createZoomStore } from './app/zoom-store'
-import { useFullView } from './app/useFullView'
-import { useMarks } from './app/useMarks'
-import { useFormValues } from './app/useFormValues'
-import { useElements } from './app/useElements'
-import { ACTIONS, useUndoStack } from './app/undo'
-import { flipPages } from './canvas/flip-pages'
-import { useExport } from './app/useExport'
-import { useImport } from './app/useImport'
-import { usePaste } from './app/usePaste'
-import { useDragController } from './app/useDragController'
-import { useKeyboardShortcuts } from './app/useKeyboardShortcuts'
-import { useFind } from './app/useFind'
-import { useSearchIndex } from './search/useSearchIndex'
-import { FindProvider } from './search/FindContext'
-import { FindBar } from './components/FindBar'
-import { useAiBridge } from './app/ai-bridge/useAiBridge'
-import { useAiChat } from './ai/useAiChat'
-import { resolveAiConfig } from './ai/provider'
-import { computeAiFocus } from './ai/focus'
-import { useAiActivity } from './ai/activity/useAiActivity'
-import { withActivity } from './ai/activity/tracker'
-import { AiActivityProvider } from './ai/activity/context'
-import { AiChatPanel } from './components/ai/AiChatPanel'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { WorkspaceView } from './WorkspaceView'
+import type { WorkspaceViewHandle } from './WorkspaceView'
+import { TabBar } from './components/TabBar'
+import { ContextMenuProvider } from './app/context-menu'
+import { carryDocs, newWorkspace, uniqueTabName } from './app/workspaces'
+import type { Workspace, WorkspaceSnapshot } from './app/workspaces'
+import type { DocsUpdate } from './app/useCollection'
+import type { DocEntry } from './types'
 
-const TOAST_MS = 4000
+interface Tabs {
+  workspaces: Workspace[]
+  activeId: string
+}
+
+const initialTabs = (): Tabs => {
+  const first = newWorkspace('Tab 1')
+  return { workspaces: [first], activeId: first.id }
+}
+
+const applyDocsUpdate = (docs: DocEntry[], update: DocsUpdate): DocEntry[] =>
+  typeof update === 'function' ? update(docs) : update
 
 export default function App(): React.JSX.Element {
-  const [busy, setBusy] = useState(false)
-  // Zoom ticks arrive ~11x/s while zooming; keep them out of App state so
-  // only the toolbar's percentage re-renders.
-  const zoomStore = useMemo(createZoomStore, [])
-  const [renderVersion, setRenderVersion] = useState(0)
-  const [toast, setToast] = useState<string | null>(null)
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const canvasRef = useRef<CanvasHandle | null>(null)
+  const [tabs, setTabs] = useState<Tabs>(initialTabs)
+  const tabsRef = useRef(tabs)
+  tabsRef.current = tabs
+  const viewRef = useRef<WorkspaceViewHandle | null>(null)
 
-  const flash = useCallback((message: string) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    setToast(message)
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
+  // The active workspace's snapshot in `tabs` goes stale while it's mounted;
+  // read the live one from the view whenever it matters.
+  const liveSnapshot = useCallback((ws: Workspace): WorkspaceSnapshot => {
+    if (ws.id === tabsRef.current.activeId && viewRef.current) return viewRef.current.snapshot()
+    return ws.snapshot
   }, [])
 
-  const undoStack = useUndoStack()
-  const markState = useMarks(undoStack.push)
-  const formState = useFormValues()
-  const elementState = useElements(undoStack.push)
-  const collection = useCollection(flash, undoStack.push)
-  const fullViewState = useFullView()
-  const docs = collection.docs
-  const layout = useMemo(() => computeLayout(docs), [docs])
-
-  const searchIndex = useSearchIndex(docs, elementState.elements)
-
-  const [aiOpen, setAiOpen] = useState(false)
-  const aiEnabled = useMemo(() => resolveAiConfig().ready, [])
-  const aiFocus = useMemo(
-    () => computeAiFocus(docs, collection.selected, fullViewState.hiddenPageId),
-    [docs, collection.selected, fullViewState.hiddenPageId]
-  )
-  const aiActivity = useAiActivity()
-  const { getOcrWords, ocrStatus } = searchIndex
-  const aiOcr = useMemo(() => ({ getOcrWords, ocrStatus }), [getOcrWords, ocrStatus])
-  const aiBridge = useAiBridge(collection, elementState, formState, markState, aiOcr, aiFocus)
-  const trackedAiBridge = useMemo(
-    () => withActivity(aiBridge, aiActivity.tracker),
-    [aiBridge, aiActivity.tracker]
-  )
-  const aiChat = useAiChat(trackedAiBridge)
-  const { busy: aiBusy } = aiChat
-  const { clear: clearAiActivity } = aiActivity
-  useEffect(() => {
-    if (!aiBusy) clearAiActivity()
-  }, [aiBusy, clearAiActivity])
-
-  const find = useFind(searchIndex.search, searchIndex.version)
-  const findState = useMemo(
-    () => ({
-      active: find.active,
-      query: find.matchedQuery,
-      matchingDocIds: find.result.docIds,
-      matchingPageIds: find.result.pageIds,
-      getOcrWords: searchIndex.getOcrWords
-    }),
-    [find.active, find.matchedQuery, find.result, searchIndex.getOcrWords]
+  // Store the active view's state into its workspace, then apply `next`.
+  const leaveActive = useCallback(
+    (next: (tabs: Tabs) => Tabs) => {
+      const current = tabsRef.current
+      const live = current.workspaces.find((w) => w.id === current.activeId)
+      const parked: Tabs = live
+        ? {
+            ...current,
+            workspaces: current.workspaces.map((w) =>
+              w.id === live.id ? { ...w, snapshot: liveSnapshot(w) } : w
+            )
+          }
+        : current
+      setTabs(next(parked))
+    },
+    [liveSnapshot]
   )
 
-  const { exportCollection, exportZip } = useExport(
-    docs,
-    markState.marks,
-    formState.values,
-    elementState.elements,
-    setBusy,
-    flash
+  const selectTab = useCallback(
+    (id: string) => {
+      if (id === tabsRef.current.activeId) return
+      leaveActive((t) => ({ ...t, activeId: id }))
+    },
+    [leaveActive]
   )
-  const { addFiles, openViaDialog, addPagesToDoc, handleExternalDropFiles } = useImport(
-    collection,
-    setBusy,
-    flash
-  )
-  const { handlePaste } = usePaste(collection, addFiles, setBusy, flash)
 
-  const drag = useDragController({
-    layout,
-    canvasRef,
-    movePageInto: collection.movePageInto,
-    movePageToNewDoc: collection.movePageToNewDoc,
-    onExternalDrop: handleExternalDropFiles
-  })
-
-  const onPaste = useCallback(() => void handlePaste(), [handlePaste])
-  const { undo: popUndo, redo: popRedo } = undoStack
-  const { applyUndo: applyMarkUndo, applyRedo: applyMarkRedo } = markState
-  const { applyUndo: applyElementUndo, applyRedo: applyElementRedo } = elementState
-  const { placePageAt, applyPageSource } = collection
-  const onUndo = useCallback(() => {
-    const entry = popUndo()
-    if (!entry) return
-    if (entry.action === ACTIONS.MARK) applyMarkUndo(entry)
-    else if (entry.action === ACTIONS.ELEMENT) applyElementUndo(entry)
-    else if (entry.action === ACTIONS.PAGE_SOURCE) applyPageSource(entry, 'undo')
-    else flipPages(() => placePageAt(entry.payload.pageId, entry.payload.from))
-  }, [popUndo, applyMarkUndo, applyElementUndo, applyPageSource, placePageAt])
-  const onRedo = useCallback(() => {
-    const entry = popRedo()
-    if (!entry) return
-    if (entry.action === ACTIONS.MARK) applyMarkRedo(entry)
-    else if (entry.action === ACTIONS.ELEMENT) applyElementRedo(entry)
-    else if (entry.action === ACTIONS.PAGE_SOURCE) applyPageSource(entry, 'redo')
-    else flipPages(() => placePageAt(entry.payload.pageId, entry.payload.to))
-  }, [popRedo, applyMarkRedo, applyElementRedo, applyPageSource, placePageAt])
-
-  useKeyboardShortcuts({
-    active: !fullViewState.fullView,
-    selected: collection.selected,
-    onDeletePage: collection.deletePage,
-    onCopy: collection.copySelected,
-    onPaste,
-    onUndo,
-    onRedo,
-    onClearSelection: collection.clearSelection,
-    findOpen: find.open,
-    onOpenFind: find.openFind,
-    onCloseFind: find.closeFind
-  })
-
-  const onScaleChange = useCallback((next: number) => zoomStore.set(next), [zoomStore])
-  const onSettle = useCallback(() => setRenderVersion((v) => v + 1), [])
-
-  const fullViewRef = fullViewState.fullViewRef
-  useEffect(() => {
-    return window.api.onZoom((action) => {
-      if (fullViewRef.current) return
-      if (action === 'in') canvasRef.current?.zoomIn()
-      else if (action === 'out') canvasRef.current?.zoomOut()
-      else canvasRef.current?.reset()
+  const addTab = useCallback(() => {
+    leaveActive((t) => {
+      const ws = newWorkspace(
+        uniqueTabName(
+          'Tab 1',
+          t.workspaces.map((w) => w.name)
+        )
+      )
+      return { workspaces: [...t.workspaces, ws], activeId: ws.id }
     })
-  }, [fullViewRef])
+  }, [leaveActive])
+
+  const closeTab = useCallback(
+    (id: string) => {
+      leaveActive((t) => {
+        const index = t.workspaces.findIndex((w) => w.id === id)
+        if (index === -1) return t
+        const rest = t.workspaces.filter((w) => w.id !== id)
+        if (rest.length === 0) return initialTabs()
+        const activeId =
+          t.activeId === id ? rest[Math.min(index, rest.length - 1)].id : t.activeId
+        return { workspaces: rest, activeId }
+      })
+    },
+    [leaveActive]
+  )
+
+  const renameTab = useCallback((id: string, name: string) => {
+    setTabs((t) => ({
+      ...t,
+      workspaces: t.workspaces.map((w) => (w.id === id ? { ...w, name: name.trim() } : w))
+    }))
+  }, [])
+
+  const recolorTab = useCallback((id: string, color: string | null) => {
+    setTabs((t) => ({
+      ...t,
+      workspaces: t.workspaces.map((w) => (w.id === id ? { ...w, color } : w))
+    }))
+  }, [])
+
+  const cycleTab = useCallback(
+    (direction: 1 | -1) => {
+      const { workspaces, activeId } = tabsRef.current
+      const index = workspaces.findIndex((w) => w.id === activeId)
+      const next = workspaces[(index + direction + workspaces.length) % workspaces.length]
+      selectTab(next.id)
+    },
+    [selectTab]
+  )
+
+  // Move documents out of the active workspace into another one (or a new
+  // tab when targetId is null), keeping their annotations and form values.
+  const moveDocsToTab = useCallback(
+    (docIds: string[], targetId: string | null) => {
+      const view = viewRef.current
+      const current = tabsRef.current
+      const active = current.workspaces.find((w) => w.id === current.activeId)
+      if (!view || !active || targetId === active.id) return
+      const snap = view.snapshot()
+      const ids = new Set(docIds)
+      const moving = snap.docs.filter((d) => ids.has(d.id))
+      if (moving.length === 0) return
+      view.removeDocs(docIds)
+      setTabs((t) => {
+        if (targetId === null) {
+          const ws = newWorkspace(
+            uniqueTabName(
+              moving.length === 1 ? moving[0].name : 'Tab 1',
+              t.workspaces.map((w) => w.name)
+            )
+          )
+          ws.snapshot = carryDocs(snap, ws.snapshot, moving)
+          return { ...t, workspaces: [...t.workspaces, ws] }
+        }
+        return {
+          ...t,
+          workspaces: t.workspaces.map((w) =>
+            w.id === targetId ? { ...w, snapshot: carryDocs(snap, w.snapshot, moving) } : w
+          )
+        }
+      })
+      const target = targetId
+        ? current.workspaces.find((w) => w.id === targetId)?.name
+        : 'a new tab'
+      view.flash(
+        `Moved ${moving.length === 1 ? `"${moving[0].name}"` : `${moving.length} documents`} to ${target}`
+      )
+    },
+    []
+  )
+
+  // A slow import that finishes after its tab was switched away from still
+  // lands in that tab.
+  const detachedUpdate = useCallback(
+    (workspaceId: string) => (update: DocsUpdate) => {
+      if (workspaceId === tabsRef.current.activeId && viewRef.current) {
+        viewRef.current.updateDocs(update)
+        return
+      }
+      setTabs((t) => ({
+        ...t,
+        workspaces: t.workspaces.map((w) =>
+          w.id === workspaceId
+            ? { ...w, snapshot: { ...w.snapshot, docs: applyDocsUpdate(w.snapshot.docs, update) } }
+            : w
+        )
+      }))
+    },
+    []
+  )
 
   useEffect(() => {
     return window.api.onMenu((action) => {
-      if (action === 'open') void openViaDialog()
-      else if (action === 'export-pdfx') void exportCollection('pdfx')
-      else if (action === 'export-pdf') void exportCollection('pdf')
-      else if (action === 'export-zip') void exportZip()
+      if (action === 'new-tab') addTab()
+      else if (action === 'close-tab') {
+        const { activeId } = tabsRef.current
+        const count = viewRef.current?.snapshot().docs.length ?? 0
+        const name = tabsRef.current.workspaces.find((w) => w.id === activeId)?.name
+        if (count === 0 || window.confirm(`Close "${name}" and its ${count} document(s)?`)) {
+          closeTab(activeId)
+        }
+      } else if (action === 'next-tab') cycleTab(1)
+      else if (action === 'previous-tab') cycleTab(-1)
     })
-  }, [openViaDialog, exportCollection, exportZip])
+  }, [addTab, closeTab, cycleTab])
 
-  const totalPages = docs.reduce((sum, d) => sum + d.pages.length, 0)
-  const { fullView } = fullViewState
-  const fullViewDoc = fullView ? docs.find((d) => d.id === fullView.docId) : undefined
+  const active = tabs.workspaces.find((w) => w.id === tabs.activeId) ?? tabs.workspaces[0]
+  const docCount = useCallback(
+    (id: string) => {
+      const ws = tabsRef.current.workspaces.find((w) => w.id === id)
+      return ws ? liveSnapshot(ws).docs.length : 0
+    },
+    [liveSnapshot]
+  )
+
+  const tabBar = (
+    <TabBar
+      workspaces={tabs.workspaces}
+      activeId={active.id}
+      onSelect={selectTab}
+      onAdd={addTab}
+      onClose={closeTab}
+      onRename={renameTab}
+      onRecolor={recolorTab}
+      docCount={docCount}
+    />
+  )
 
   return (
-    <FindProvider value={findState}>
-      <AiActivityProvider value={aiActivity.view}>
-        <div
-          className={
-            'app' + (drag.committing ? ' committing' : '') + (drag.dragKind ? ' dragging' : '')
-          }
-          onDragEnter={drag.handlers.onDragEnter}
-          onDragOver={drag.handlers.onDragOver}
-          onDragLeave={drag.handlers.onDragLeave}
-          onDrop={drag.handlers.onDrop}
-        >
-          <Toolbar
-            documentCount={docs.length}
-            pageCount={totalPages}
-            busy={busy}
-            zoomStore={zoomStore}
-            aiOpen={aiOpen}
-            aiEnabled={aiEnabled}
-            onZoomIn={() => canvasRef.current?.zoomIn()}
-            onZoomOut={() => canvasRef.current?.zoomOut()}
-            onZoomReset={() => canvasRef.current?.reset()}
-            onOpen={openViaDialog}
-            onExportPdf={() => exportCollection('pdf')}
-            onExportZip={exportZip}
-            onToggleAi={() => setAiOpen((open) => !open)}
-          />
-
-          {find.open && (
-            <FindBar
-              query={find.query}
-              result={find.result}
-              ocrRemaining={searchIndex.ocrRemaining}
-              hasScanned={searchIndex.hasScanned}
-              ocrLanguage={searchIndex.ocrLanguage}
-              onQuery={find.setQuery}
-              onOcrLanguage={searchIndex.setOcrLanguage}
-              onClose={find.closeFind}
-            />
-          )}
-
-          <CollectionCanvas
-            docs={docs}
-            layout={layout}
-            busy={busy}
-            pagesDraggable={totalPages >= 2}
-            renderVersion={renderVersion}
-            selected={collection.selected}
-            hiddenPageId={fullViewState.hiddenPageId}
-            marks={markState.marks}
-            formValues={formState.values}
-            elements={elementState.elements}
-            dragKind={drag.dragKind}
-            draggingPage={drag.draggingPage}
-            dropTarget={drag.dropTarget}
-            collapsedId={drag.collapsedId}
-            externalCount={drag.externalCount}
-            canvasRef={canvasRef}
-            onScaleChange={onScaleChange}
-            onSettle={onSettle}
-            onBackgroundClick={collection.clearSelection}
-            onOpen={openViaDialog}
-            onSelectPage={collection.selectPage}
-            onOpenPage={fullViewState.openPage}
-            onPageDragStart={drag.startPageDrag}
-            onPageDragEnd={drag.clearDrag}
-            onAddPage={addPagesToDoc}
-            onMoveDoc={collection.moveDoc}
-            onRemoveDoc={collection.removeDoc}
-            onRenameDoc={collection.renameDoc}
-          />
-
-          {fullView && fullViewDoc && (
-            <FullView
-              docs={docs}
-              startDocId={fullView.docId}
-              startPageId={fullView.pageId}
-              originRect={fullView.originRect}
-              marks={markState.marks}
-              onToggleMark={markState.toggleMark}
-              onRestoreMarks={markState.restoreMarks}
-              formValues={formState.values}
-              onFieldChange={formState.setFieldValue}
-              elements={elementState.elements}
-              onAddInk={elementState.addInk}
-              onAddText={elementState.addText}
-              onRemoveElement={elementState.removeElement}
-              onMoveElement={elementState.moveElement}
-              onToggleTextMark={elementState.toggleTextMark}
-              onUpdateText={elementState.updateText}
-              onActivePageChange={fullViewState.setHiddenPageId}
-              onClose={fullViewState.closeFullView}
-            />
-          )}
-
-          <AnimatePresence>
-            {aiOpen && (
-              <AiChatPanel
-                messages={aiChat.messages}
-                busy={aiChat.busy}
-                onSend={aiChat.send}
-                onClose={() => setAiOpen(false)}
-              />
-            )}
-          </AnimatePresence>
-
-          {toast && <div className="toast">{toast}</div>}
-        </div>
-      </AiActivityProvider>
-    </FindProvider>
+    <ContextMenuProvider>
+      <WorkspaceView
+        key={active.id}
+        initial={active.snapshot}
+        handleRef={viewRef}
+        tabBar={tabBar}
+        workspaces={tabs.workspaces}
+        activeWorkspaceId={active.id}
+        onMoveDocsToTab={moveDocsToTab}
+        onDetachedUpdate={detachedUpdate(active.id)}
+      />
+    </ContextMenuProvider>
   )
 }

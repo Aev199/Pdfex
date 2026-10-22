@@ -7,12 +7,13 @@ import { ADD_PAGE_WIDTH } from '../canvas/layout'
 import { AddPageGhost, GhostPage } from './DropGhost'
 import { PageCell } from './page-cell'
 import { useFindState } from '../search/FindContext'
+import type { SelectModifiers } from '../app/useCollection'
 
 interface DocumentRowProps {
   doc: DocEntry
   pageHeight: number
   renderVersion: number
-  selectedPageId: string | null
+  selectedIds: ReadonlySet<string>
   pagesDraggable: boolean
   collapseId: string | null
   hiddenPageId: string | null
@@ -20,7 +21,8 @@ interface DocumentRowProps {
   formValues: FormValuesBySource
   elements: ElementMap
   intoGhost: { index: number; width: number; height: number } | null
-  onSelectPage: (docId: string, pageId: string) => void
+  onSelectPage: (docId: string, pageId: string, modifiers?: SelectModifiers) => void
+  onPageContextMenu: (docId: string, pageId: string, x: number, y: number) => void
   onOpenPage: (docId: string, pageId: string) => void
   onPageDragStart: (docId: string, pageId: string) => void
   onPageDragEnd: () => void
@@ -31,7 +33,7 @@ function DocumentRowImpl({
   doc,
   pageHeight,
   renderVersion,
-  selectedPageId,
+  selectedIds,
   pagesDraggable,
   collapseId,
   hiddenPageId,
@@ -40,6 +42,7 @@ function DocumentRowImpl({
   elements,
   intoGhost,
   onSelectPage,
+  onPageContextMenu,
   onOpenPage,
   onPageDragStart,
   onPageDragEnd,
@@ -68,7 +71,7 @@ function DocumentRowImpl({
         page={page}
         pageHeight={pageHeight}
         renderVersion={renderVersion}
-        selected={page.id === selectedPageId}
+        selected={selectedIds.has(page.id)}
         collapsed={collapsed}
         hidden={page.id === hiddenPageId}
         dimmed={active && !docDimmed && !matchingPageIds.has(page.id)}
@@ -80,6 +83,7 @@ function DocumentRowImpl({
         pagesDraggable={pagesDraggable}
         visibleNumber={visible + 1}
         onSelectPage={onSelectPage}
+        onPageContextMenu={onPageContextMenu}
         onOpenPage={onOpenPage}
         onPageDragStart={onPageDragStart}
         onPageDragEnd={onPageDragEnd}

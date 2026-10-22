@@ -1,4 +1,4 @@
-import { ipcMain, dialog, clipboard } from 'electron'
+import { ipcMain, dialog, clipboard, nativeImage } from 'electron'
 import { basename, isAbsolute } from 'path'
 import { existsSync } from 'fs'
 import { writeFile } from 'fs/promises'
@@ -6,7 +6,9 @@ import { markupToPdf } from './markup'
 import { OpenedFile, IMPORTABLE, readFiles, expandDropPaths } from './file-intake'
 import { clipboardFilePaths } from './clipboard'
 import { readResource } from './resource'
-import { readSource, statSource } from './source-files'
+import { fileInfo, readSource, statSource } from './source-files'
+import { listExternalApps, openExternal, resolveFile } from './open-with'
+import type { OpenAction, OpenSource } from './open-with'
 import { getMainWindow, setRendererReady, sendOpenPaths } from './window'
 
 const MAX_WRITE_BYTES = 1024 * 1024 * 1024 // 1 GiB cap on a single IPC write
@@ -53,9 +55,31 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
 
   ipcMain.handle('pdfx:read-source', (_event, path: unknown) => readSource(path))
 
+  ipcMain.handle('pdfx:file-info', (_event, path: unknown) => fileInfo(path))
+
   ipcMain.handle('pdfx:stat-sources', (_event, paths: unknown) =>
     Array.isArray(paths) ? Promise.all(paths.slice(0, 10_000).map(statSource)) : []
   )
+
+  ipcMain.handle('pdfx:list-external-apps', () => listExternalApps())
+
+  ipcMain.handle('pdfx:open-external', (_event, action: OpenAction, source: OpenSource) =>
+    openExternal(action, source)
+  )
+
+  // Dragging a document out of the window drops a real PDF into Explorer.
+  ipcMain.on('pdfx:drag-out', (event, source: OpenSource, iconDataUrl: string) => {
+    void (async () => {
+      try {
+        const file = await resolveFile(source)
+        const icon = nativeImage.createFromDataURL(String(iconDataUrl))
+        if (icon.isEmpty()) return
+        event.sender.startDrag({ file, icon })
+      } catch (error) {
+        console.error('drag-out failed', error)
+      }
+    })()
+  })
 
   ipcMain.handle('pdfx:read-resource', (_event, htmlPath: string, ref: string) =>
     readResource(htmlPath, ref)

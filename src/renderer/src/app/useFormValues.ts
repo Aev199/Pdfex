@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import type { FieldValue, FormValuesBySource } from '../forms/types'
 
-export function useFormValues() {
-  const [values, setValues] = useState<FormValuesBySource>({})
+export function useFormValues(initial: FormValuesBySource = {}) {
+  const [values, setValues] = useState<FormValuesBySource>(initial)
   const valuesRef = useRef(values)
   valuesRef.current = values
 

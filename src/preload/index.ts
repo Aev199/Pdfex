@@ -8,6 +8,19 @@ export interface OpenedFile {
   mtimeMs?: number
 }
 
+export interface ExternalApp {
+  name: string
+  path: string
+}
+
+export type OpenAction =
+  | { type: 'default' }
+  | { type: 'explorer' }
+  | { type: 'pick' }
+  | { type: 'app'; path: string }
+
+export type OpenSource = { path: string } | { bytes: Uint8Array; name: string }
+
 export interface FileStamp {
   size: number
   mtimeMs: number
@@ -15,7 +28,15 @@ export interface FileStamp {
 
 export type ZoomAction = 'in' | 'out' | 'reset'
 
-export type MenuAction = 'open' | 'export-pdfx' | 'export-pdf' | 'export-zip'
+export type MenuAction =
+  | 'open'
+  | 'export-pdfx'
+  | 'export-pdf'
+  | 'export-zip'
+  | 'new-tab'
+  | 'close-tab'
+  | 'next-tab'
+  | 'previous-tab'
 
 export interface SaveFilter {
   name: string
@@ -37,8 +58,17 @@ const api = {
   // Re-read a file the user opened earlier (null if moved, deleted or never opened).
   readSource: (path: string): Promise<(FileStamp & { data: Uint8Array }) | null> =>
     ipcRenderer.invoke('pdfx:read-source', path),
+  fileInfo: (
+    path: string
+  ): Promise<{ size: number; createdMs: number; modifiedMs: number } | null> =>
+    ipcRenderer.invoke('pdfx:file-info', path),
   statSources: (paths: string[]): Promise<(FileStamp | null)[]> =>
     ipcRenderer.invoke('pdfx:stat-sources', paths),
+  listExternalApps: (): Promise<ExternalApp[]> => ipcRenderer.invoke('pdfx:list-external-apps'),
+  openExternal: (action: OpenAction, source: OpenSource): Promise<void> =>
+    ipcRenderer.invoke('pdfx:open-external', action, source),
+  dragOut: (source: OpenSource, iconDataUrl: string): void =>
+    ipcRenderer.send('pdfx:drag-out', source, iconDataUrl),
   readResource: (
     htmlPath: string,
     ref: string

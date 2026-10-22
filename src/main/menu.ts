@@ -59,7 +59,24 @@ export function buildMenu(): void {
         }
       ]
     },
-    { role: 'windowMenu' }
+    {
+      label: 'Tabs',
+      submenu: [
+        { label: 'New Tab', accelerator: 'CommandOrControl+T', click: sendMenu('new-tab') },
+        { label: 'Close Tab', accelerator: 'CommandOrControl+W', click: sendMenu('close-tab') },
+        { type: 'separator' },
+        { label: 'Next Tab', accelerator: 'Control+Tab', click: sendMenu('next-tab') },
+        {
+          label: 'Previous Tab',
+          accelerator: 'Control+Shift+Tab',
+          click: sendMenu('previous-tab')
+        }
+      ]
+    },
+    {
+      role: 'window',
+      submenu: [{ role: 'minimize' }, ...(process.platform === 'darwin' ? [{ role: 'zoom' as const }] : [])]
+    }
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
