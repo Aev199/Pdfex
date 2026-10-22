@@ -1,4 +1,5 @@
 import { _electron as electron } from 'playwright-core'
+import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import electronPath from 'electron'
@@ -19,6 +20,19 @@ export async function launch(dataDir, files = []) {
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   return { app, page, errors }
+}
+
+// Simulate a crash: the whole app dies at once, as when the machine loses
+// power. On Windows killing only the main process would leave its GPU and
+// utility processes behind for a few seconds, still holding the profile.
+export async function crash(app) {
+  const pid = app.process().pid
+  if (process.platform === 'win32') {
+    execFileSync('taskkill', ['/F', '/T', '/PID', String(pid)], { stdio: 'ignore' })
+  } else {
+    process.kill(pid, 'SIGKILL')
+  }
+  await new Promise((resolve) => setTimeout(resolve, 2000))
 }
 
 export const rendered = (page, count = 1) =>

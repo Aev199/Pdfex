@@ -9,6 +9,7 @@ import { inflateSync } from 'node:zlib'
 import { makeFixtures } from './fixtures.mjs'
 import {
   clickMenuItem,
+  crash,
   launch,
   menu,
   mockSaveDialog,
@@ -138,7 +139,7 @@ test('tabs and camera survive a restart, and a crash', async () => {
     await run.page.locator('.doc-name').nth(1).click({ button: 'right' })
     await clickMenuItem(run.page, 'Duplicate document')
     await run.page.waitForTimeout(2500)
-    process.kill(run.app.process().pid, 'SIGKILL')
+    await crash(run.app)
   } catch (error) {
     await run.app.close()
     throw error
@@ -268,6 +269,11 @@ for (const { name, fn } of tests) {
     console.log(`  ✗ ${name}\n    ${error?.stack ?? error}`)
   }
 }
-rmSync(work, { recursive: true, force: true })
+// Best effort: Windows may still hold a file of a just-closed instance.
+try {
+  rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 })
+} catch {
+  // Left for the OS to clean up.
+}
 console.log(failed ? `${failed} of ${tests.length} failed` : `all ${tests.length} passed`)
 process.exit(failed ? 1 : 0)
