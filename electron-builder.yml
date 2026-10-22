@@ -13,6 +13,7 @@ files:
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{vitest.config.ts,vite.config.web.ts,dev-vars.ts}'
   - '!.github/**'
+  - '!e2e/**'
   - '!{.prettierignore,.prettierrc.yaml,.editorconfig,dev-app-update.yml,README.md,SPEC.md}'
   - '!{.env,.env.*,.dev.vars,.dev.vars.example,.npmrc,pnpm-lock.yaml,yarn.lock}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'

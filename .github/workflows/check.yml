@@ -18,3 +18,5 @@ jobs:
       - run: yarn typecheck
       - run: yarn test
       - run: yarn electron-vite build
+      - name: End-to-end checks
+        run: xvfb-run -a yarn e2e
