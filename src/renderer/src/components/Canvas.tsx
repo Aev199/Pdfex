@@ -46,7 +46,7 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
   const draggingRef = useRef(dragging)
   draggingRef.current = dragging
 
-  const { zoomRef, fitTransform } = useZoomBehavior({
+  const { zoomRef, animatorRef, fitTransform } = useZoomBehavior({
     viewportRef,
     worldRef,
     overlayRef,
@@ -77,7 +77,7 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     hadContentRef.current = hasContent
   }, [contentWidth, contentHeight])
 
-  useImperativeHandle(ref, () => createCanvasHandle({ viewportRef, zoomRef, fitTransform }))
+  useImperativeHandle(ref, () => createCanvasHandle({ viewportRef, zoomRef, animatorRef, fitTransform }))
 
   return (
     <div

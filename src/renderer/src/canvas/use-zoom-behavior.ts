@@ -40,9 +40,11 @@ export function useZoomBehavior({
   onSettle
 }: ZoomBehaviorArgs): {
   zoomRef: RefObject<ZoomBehavior<HTMLDivElement, unknown> | null>
+  animatorRef: RefObject<WheelAnimator | null>
   fitTransform: () => ReturnType<typeof zoomIdentity.translate>
 } {
   const zoomRef = useRef<ZoomBehavior<HTMLDivElement, unknown> | null>(null)
+  const animatorRef = useRef<WheelAnimator | null>(null)
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTick = useRef(0)
   const onScaleRef = useRef(onScaleChange)
@@ -85,6 +87,8 @@ export function useZoomBehavior({
       }
     })
 
+    animatorRef.current = animator
+
     const onWheel = (event: WheelEvent): void => {
       event.preventDefault()
       const intent = interpretWheel(event, vp.clientHeight)
@@ -123,5 +127,5 @@ export function useZoomBehavior({
     }
   }, [])
 
-  return { zoomRef, fitTransform }
+  return { zoomRef, animatorRef, fitTransform }
 }
