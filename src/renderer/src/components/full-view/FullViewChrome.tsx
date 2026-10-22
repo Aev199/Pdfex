@@ -1,6 +1,8 @@
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '../icons'
 import { isMac } from './geometry'
 import type { EditTool } from '../../edit/types'
+import type { DrawStyle } from '../../elements/types'
+import { AnnotateBar } from './AnnotateBar'
 
 interface FullViewChromeProps {
   chromeOpacity: number
@@ -14,6 +16,8 @@ interface FullViewChromeProps {
   onFinishEdit: () => void
   onRevert: () => void
   onToggleTool: (tool: EditTool) => void
+  drawStyle: DrawStyle
+  onDrawStyle: (style: DrawStyle) => void
   runClose: () => void
   navByKey: (axis: 'x' | 'y', dir: 1 | -1) => void
 }
@@ -30,6 +34,8 @@ export function FullViewChrome({
   onFinishEdit,
   onRevert,
   onToggleTool,
+  drawStyle,
+  onDrawStyle,
   runClose,
   navByKey
 }: FullViewChromeProps): React.JSX.Element {
@@ -85,6 +91,9 @@ export function FullViewChrome({
           </button>
         </div>
       </header>
+      {editing && (
+        <AnnotateBar tool={tool} style={drawStyle} onTool={onToggleTool} onStyle={onDrawStyle} />
+      )}
 
       <button
         className="full-nav prev"

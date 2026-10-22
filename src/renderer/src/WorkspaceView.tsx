@@ -614,6 +614,8 @@ export function WorkspaceView({
               onFieldChange={formState.setFieldValue}
               elements={elementState.elements}
               onAddInk={elementState.addInk}
+              onAddShape={elementState.addShape}
+              onRemoveElements={elementState.removeElements}
               onAddText={elementState.addText}
               onRemoveElement={elementState.removeElement}
               onMoveElement={elementState.moveElement}

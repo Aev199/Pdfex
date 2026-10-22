@@ -16,6 +16,10 @@ import { ElementsLayer } from '../elements/ElementsLayer'
 import { DrawLayer } from '../elements/DrawLayer'
 import { TypeLayer } from '../elements/TypeLayer'
 import { SelectableTextLayer } from './edit/SelectableTextLayer'
+import { ShapeLayer } from '../elements/ShapeLayer'
+import { EraseLayer } from '../elements/EraseLayer'
+import { isShapeTool } from '../../edit/types'
+import type { AnnotateHandlers } from './annotate'
 
 interface FullViewPageProps {
   page: PageEntry
@@ -38,6 +42,7 @@ interface FullViewPageProps {
   onSelectElement: (id: string | null) => void
   onMoveElement: (id: string, dx: number, dy: number) => void
   onDraw: (points: ElementPoint[]) => void
+  annotate: AnnotateHandlers
   onAddText: (text: string, origin: ElementPoint) => void
   onMarkText: (id: string, span: TextSpan) => void
   onUpdateText: (id: string, text: string) => void
@@ -113,7 +118,10 @@ export function FullViewPage(props: FullViewPageProps): React.JSX.Element {
             elements={elements}
             naturalWidth={p.width}
             naturalHeight={p.height}
-            interactive={isCurrent && (selectTool === null || isElementTool(selectTool))}
+            interactive={
+              isCurrent &&
+              (selectTool === null || (isElementTool(selectTool) && selectTool !== 'eraser'))
+            }
             aboveDraw={isCurrent && selectTool !== null}
             zoomScale={isCurrent && zoomed ? view.zoom : 1}
             selectedId={selectedElementId}
@@ -146,6 +154,33 @@ export function FullViewPage(props: FullViewPageProps): React.JSX.Element {
         )}
         {isCurrent && selectTool === 'draw' && (
           <DrawLayer naturalWidth={p.width} naturalHeight={p.height} onCommit={onDraw} />
+        )}
+        {isCurrent && selectTool === 'pen' && (
+          <DrawLayer
+            naturalWidth={p.width}
+            naturalHeight={p.height}
+            style={props.annotate.style}
+            onCommit={(points) => props.annotate.onPen(p.id, points, p.width, p.height)}
+          />
+        )}
+        {isCurrent && isShapeTool(selectTool) && (
+          <ShapeLayer
+            shape={selectTool}
+            style={props.annotate.style}
+            naturalWidth={p.width}
+            naturalHeight={p.height}
+            onCommit={(from, to) =>
+              props.annotate.onShape(p.id, selectTool, from, to, p.width, p.height)
+            }
+          />
+        )}
+        {isCurrent && selectTool === 'eraser' && (
+          <EraseLayer
+            elements={elements ?? []}
+            naturalWidth={p.width}
+            naturalHeight={p.height}
+            onErase={(ids) => props.annotate.onErase(p.id, ids)}
+          />
         )}
         {isCurrent && selectTool === 'text' && (
           <TypeLayer naturalHeight={p.height} onCommit={onAddText} />

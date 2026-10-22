@@ -12,11 +12,12 @@ export function applyElementEntry(
     const kept = page.filter((e) => e.id !== element.id)
     return remove ? kept : [...kept, element]
   }
-  if (entry.value === 'add-batch') {
+  if (entry.value === 'add-batch' || entry.value === 'remove-batch') {
     const { elements } = entry.payload
     const ids = new Set(elements.map((e) => e.id))
     const kept = page.filter((e) => !ids.has(e.id))
-    return direction === 'undo' ? kept : [...kept, ...elements]
+    const remove = (entry.value === 'add-batch') === (direction === 'undo')
+    return remove ? kept : [...kept, ...elements]
   }
   if (entry.value === 'move' || entry.value === 'mark' || entry.value === 'edit') {
     const target = direction === 'undo' ? entry.payload.before : entry.payload.after

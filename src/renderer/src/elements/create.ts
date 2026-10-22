@@ -1,5 +1,5 @@
 import { INK_COLOR, INK_STROKE_WIDTH, TEXT_COLOR, TEXT_FONT_SIZE } from './types'
-import type { ElementPoint, ElementRect, InkElement, TextElement } from './types'
+import type { DrawStyle, ElementPoint, ElementRect, InkElement, TextElement } from './types'
 import { bboxOfPoints, refineInkPoints } from './geometry'
 import { clipMarks } from './text-marks'
 import { textBlockSize } from './measure'
@@ -10,7 +10,8 @@ export function createInkElement(
   points: ElementPoint[],
   number: number,
   pageWidth: number,
-  pageHeight: number
+  pageHeight: number,
+  style: DrawStyle = { color: INK_COLOR, strokeWidth: INK_STROKE_WIDTH }
 ): InkElement | null {
   if (points.length < 2) return null
   const thinned = refineInkPoints(points)
@@ -18,8 +19,8 @@ export function createInkElement(
     id: crypto.randomUUID(),
     kind: 'ink',
     number,
-    color: INK_COLOR,
-    strokeWidth: INK_STROKE_WIDTH,
+    color: style.color,
+    strokeWidth: style.strokeWidth,
     points: thinned,
     bbox: bboxOfPoints(thinned, BBOX_PAD_POINTS / pageWidth, BBOX_PAD_POINTS / pageHeight)
   }

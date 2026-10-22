@@ -50,7 +50,7 @@ export type ElementUndoEntry =
     }
   | {
       action: typeof ACTIONS.ELEMENT
-      value: 'add-batch'
+      value: 'add-batch' | 'remove-batch'
       payload: { pageId: string; elements: PageElement[] }
     }
   | {

@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from 'react'
 import type { MarkKind } from '../edit/types'
-import type { ElementMap, ElementPoint, PageElement } from '../elements/types'
+import type { DrawStyle, ElementMap, ElementPoint, PageElement, ShapeKind } from '../elements/types'
 import { translateElement } from '../elements/geometry'
 import { createInkElement, createTextElement, editedTextElement } from '../elements/create'
+import { createShapeElement } from '../elements/shapes'
 import { applyElementEntry } from '../elements/apply-entry'
 import { toggleMark } from '../elements/text-marks'
 import type { TextSpan } from '../elements/text-marks'
@@ -32,9 +33,51 @@ export function useElements(
   )
 
   const addInk = useCallback(
-    (pageId: string, points: ElementPoint[], pageWidth: number, pageHeight: number) =>
-      addElement(pageId, createInkElement(points, nextNumberRef.current, pageWidth, pageHeight)),
+    (
+      pageId: string,
+      points: ElementPoint[],
+      pageWidth: number,
+      pageHeight: number,
+      style?: DrawStyle
+    ) =>
+      addElement(
+        pageId,
+        createInkElement(points, nextNumberRef.current, pageWidth, pageHeight, style)
+      ),
     [addElement]
+  )
+
+  const addShape = useCallback(
+    (
+      pageId: string,
+      shape: ShapeKind,
+      from: ElementPoint,
+      to: ElementPoint,
+      pageWidth: number,
+      pageHeight: number,
+      style: DrawStyle
+    ) =>
+      addElement(
+        pageId,
+        createShapeElement(shape, from, to, nextNumberRef.current, pageWidth, pageHeight, style)
+      ),
+    [addElement]
+  )
+
+  // The eraser: one undo step for everything wiped in one stroke.
+  const removeElements = useCallback(
+    (pageId: string, ids: string[]) => {
+      const map = elementsRef.current
+      const gone = (map[pageId] ?? []).filter((e) => ids.includes(e.id))
+      if (gone.length === 0) return
+      pushUndo({
+        action: ACTIONS.ELEMENT,
+        value: 'remove-batch',
+        payload: { pageId, elements: gone }
+      })
+      setElements({ ...map, [pageId]: map[pageId].filter((e) => !ids.includes(e.id)) })
+    },
+    [pushUndo]
   )
 
   const addText = useCallback(
@@ -177,6 +220,8 @@ export function useElements(
     copyToPages,
     nextNumberRef,
     addInk,
+    addShape,
+    removeElements,
     addText,
     addTexts,
     removeElement,

@@ -631,3 +631,94 @@
   background: var(--accent);
   color: var(--accent-ink);
 }
+
+/* Annotation tools: second row under the full-view header while editing. */
+.annotate-bar {
+  position: absolute;
+  top: calc(var(--toolbar-h) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  /* Above the page's element and drawing layers, like the header. */
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: var(--overlay-strong);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline),
+    0 10px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.annotate-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.annotate-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--hairline);
+}
+
+.annotate-tool,
+.annotate-width {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.annotate-tool:hover,
+.annotate-width:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.annotate-tool.on,
+.annotate-width.on {
+  background: var(--control);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+
+.annotate-width span {
+  display: block;
+  width: 18px;
+  border-radius: 4px;
+}
+
+.annotate-swatch {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.annotate-swatch.on {
+  box-shadow:
+    0 0 0 2px var(--overlay-strong),
+    0 0 0 4px var(--ink);
+}
+
+.erase-layer {
+  cursor: cell;
+}
+
+.erase-hit {
+  fill: rgba(229, 50, 45, 0.18);
+  stroke: #e5322d;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}

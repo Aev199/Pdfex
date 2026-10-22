@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import type { DocEntry } from '../types'
 import type { MarkKind, MarkMap, MarkRect } from '../edit/types'
 import { isMarkTool } from '../edit/types'
 import type { FieldValue, FormValuesBySource } from '../forms/types'
-import type { ElementMap, ElementPoint } from '../elements/types'
+import type { DrawStyle, ElementMap, ElementPoint, ShapeKind } from '../elements/types'
+import type { AnnotateHandlers } from './full-view/annotate'
 import type { TextSpan } from '../elements/text-marks'
 import type { Rect } from './full-view/geometry'
 import { useElementSelection } from './full-view/use-element-selection'
@@ -28,7 +29,23 @@ interface FullViewProps {
   formValues: FormValuesBySource
   onFieldChange: (sourceId: string, fieldName: string, value: FieldValue) => void
   elements: ElementMap
-  onAddInk: (pageId: string, points: ElementPoint[], pageWidth: number, pageHeight: number) => void
+  onAddInk: (
+    pageId: string,
+    points: ElementPoint[],
+    pageWidth: number,
+    pageHeight: number,
+    style?: DrawStyle
+  ) => void
+  onAddShape: (
+    pageId: string,
+    shape: ShapeKind,
+    from: ElementPoint,
+    to: ElementPoint,
+    pageWidth: number,
+    pageHeight: number,
+    style: DrawStyle
+  ) => void
+  onRemoveElements: (pageId: string, ids: string[]) => void
   onAddText: (
     pageId: string,
     text: string,
@@ -62,6 +79,8 @@ export function FullView({
   onFieldChange,
   elements,
   onAddInk,
+  onAddShape,
+  onRemoveElements,
   onAddText,
   onRemoveElement,
   onMoveElement,
@@ -145,6 +164,18 @@ export function FullView({
     ...controls
   })
 
+  const { drawStyle } = edit
+  const annotate = useMemo<AnnotateHandlers>(
+    () => ({
+      style: drawStyle,
+      onPen: (pageId, points, w, h) => onAddInk(pageId, points, w, h, drawStyle),
+      onShape: (pageId, shape, from, to, w, h) =>
+        onAddShape(pageId, shape, from, to, w, h, drawStyle),
+      onErase: onRemoveElements
+    }),
+    [drawStyle, onAddInk, onAddShape, onRemoveElements]
+  )
+
   const animating = s.phase !== 'open'
   const chromeOpacity = s.revealed ? 1 : 0
 
@@ -182,6 +213,7 @@ export function FullView({
         onSelectElement={selection.selectElement}
         onMoveElement={onMoveElement}
         onDraw={onAddInk}
+        annotate={annotate}
         onAddText={onAddText}
         onMarkText={(pageId, elementId, span) => {
           if (isMarkTool(edit.tool)) onToggleTextMark(pageId, elementId, edit.tool, span)
@@ -205,6 +237,8 @@ export function FullView({
         onFinishEdit={edit.finishEdit}
         onRevert={edit.revert}
         onToggleTool={edit.toggleTool}
+        drawStyle={edit.drawStyle}
+        onDrawStyle={edit.setDrawStyle}
         runClose={controls.runClose}
         navByKey={controls.navByKey}
       />
