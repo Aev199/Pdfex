@@ -46,6 +46,12 @@ interface OcrJob {
 
 const OCR_CONCURRENCY = 2
 
+// OCR results outlive any one engine: switching tabs remounts the workspace
+// (and its engine), and recognizing a 400-page scan again would take minutes.
+// Keyed by language and source page; sources keep their ids across tabs.
+const ocrCache = new Map<string, { text: string; words: OcrWord[] }>()
+const OCR_CACHE_MAX = 5000
+
 export function createSearchEngine({
   onChange,
   onProgress,
@@ -91,6 +97,14 @@ export function createSearchEngine({
 
   function enqueueOcr(job: OcrJob): void {
     if (ocrQueued.has(job.key)) return
+    const cached = ocrCache.get(`${lang}|${job.key}`)
+    if (cached) {
+      sourceOcr.set(job.key, cached.text)
+      sourceOcrWords.set(job.key, cached.words)
+      applySource(job.key)
+      onChange()
+      return
+    }
     ocrQueued.add(job.key)
     ocrQueue.push(job)
     reportProgress()
@@ -106,6 +120,9 @@ export function createSearchEngine({
       ensureClient()
         .recognize(job.pdf, job.pageIndex, jobId)
         .then(({ text, words }) => {
+          const cacheKey = `${lang}|${job.key}`
+          if (ocrCache.size >= OCR_CACHE_MAX) ocrCache.delete(ocrCache.keys().next().value!)
+          ocrCache.set(cacheKey, { text: normalizeText(text), words })
           if (!pagesBySource.has(job.key)) return
           sourceOcr.set(job.key, normalizeText(text))
           sourceOcrWords.set(job.key, words)
