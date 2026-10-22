@@ -553,3 +553,19 @@
 .toast {
   bottom: 52px;
 }
+
+/* Engineering file names run long ("Технический отчёт по результатам
+   инженерно-геологических изысканий…"): give titles more room before the
+   ellipsis; the full name is in the tooltip and the hover ribbon. */
+.doc-name {
+  max-width: 760px;
+}
+
+.doc-name-input {
+  max-width: none;
+}
+
+.doc-index,
+.doc-pages {
+  color: var(--ink-soft);
+}
