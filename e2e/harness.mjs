@@ -1,12 +1,13 @@
 import { _electron as electron } from 'playwright-core'
-import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import electronPath from 'electron'
 
-const ROOT = new URL('..', import.meta.url).pathname
+const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 // Launch the built app (out/) with its data folder pinned to `dataDir`.
 export async function launch(dataDir, files = []) {
   const app = await electron.launch({
-    executablePath: join(ROOT, 'node_modules/electron/dist/electron'),
+    executablePath: electronPath,
     args: [ROOT, '--no-sandbox', ...files],
     env: { ...process.env, PDFX_USER_DATA: dataDir },
     timeout: 60_000

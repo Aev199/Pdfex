@@ -24,6 +24,8 @@ jobs:
       - run: yarn typecheck
       - run: yarn test
       - run: yarn electron-vite build
+      - name: End-to-end checks on Windows
+        run: yarn e2e
       - run: yarn electron-builder --win --publish never
       - run: node scripts/verify-portable.mjs dist/win-unpacked
       - name: Smoke-launch pdfx.exe
