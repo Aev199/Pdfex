@@ -138,6 +138,7 @@ export function FullView({
   useFullViewInput({
     scrollRef: s.scrollRef,
     zoomedRef: s.zoomedRef,
+    viewRef: s.viewRef,
     phaseRef: s.phaseRef,
     editingRef: edit.editingRef,
     finishEdit: edit.finishEdit,

@@ -21,7 +21,10 @@ export function createZoomBehavior(refs: ZoomHandlerRefs): ZoomBehavior<HTMLDivE
     .constrain(reversibleConstrain)
     .filter((event) => {
       if (event.type === 'wheel') return false
-      if ((event as MouseEvent).button) return false
+      const button = (event as MouseEvent).button
+      // Middle button (wheel click) pans from anywhere, even on top of a page.
+      if (button === 1) return true
+      if (button) return false
       const target = event.target as Element | null
       return !target?.closest('.page, button, input, textarea, .doc-actions, .doc-header')
     })

@@ -7,6 +7,15 @@ import App from './App'
 import './styles.css'
 
 export function mountPdfxApp(container: HTMLElement): void {
+  // Middle-button drag pans the canvas; keep Chromium's autoscroll cursor
+  // (Windows) and middle-click paste (Linux) from hijacking it.
+  window.addEventListener(
+    'mousedown',
+    (event) => {
+      if (event.button === 1) event.preventDefault()
+    },
+    { capture: true }
+  )
   const pdfWorker = new Worker(new URL('./pdf.worker.ts', import.meta.url), { type: 'module' })
   GlobalWorkerOptions.workerPort = pdfWorker
   createRoot(container).render(
