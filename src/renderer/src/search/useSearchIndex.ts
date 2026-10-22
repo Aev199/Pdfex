@@ -17,6 +17,7 @@ export interface SearchIndex {
   setOcrLanguage: (lang: string) => void
   getOcrWords: (sourceKey: string) => OcrWord[] | undefined
   ocrStatus: (sourceKey: string) => OcrStatus
+  activateOcr: () => void
 }
 
 export function useSearchIndex(docs: DocEntry[], elements: ElementMap): SearchIndex {
@@ -67,6 +68,7 @@ export function useSearchIndex(docs: DocEntry[], elements: ElementMap): SearchIn
   const search = useCallback((query: string) => engine.search(query), [engine])
   const getOcrWords = useCallback((sourceKey: string) => engine.getOcrWords(sourceKey), [engine])
   const ocrStatus = useCallback((sourceKey: string) => engine.ocrStatus(sourceKey), [engine])
+  const activateOcr = useCallback(() => engine.activateOcr(), [engine])
 
   const setOcrLanguage = useCallback(
     (lang: string) => {
@@ -84,6 +86,7 @@ export function useSearchIndex(docs: DocEntry[], elements: ElementMap): SearchIn
     ocrLanguage,
     setOcrLanguage,
     getOcrWords,
-    ocrStatus
+    ocrStatus,
+    activateOcr
   }
 }

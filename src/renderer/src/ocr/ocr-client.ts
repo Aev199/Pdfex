@@ -1,6 +1,7 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { OcrRequest, OcrResponse } from './protocol'
 import type { OcrResult } from './types'
+import { track } from '../pdfx/pdf-activity'
 
 const OCR_DPI = 300
 const MAX_SCALE = 4.2
@@ -14,7 +15,7 @@ async function rasterize(pdf: PDFDocumentProxy, pageIndex: number): Promise<Imag
   canvas.height = Math.max(1, Math.ceil(viewport.height))
   const context = canvas.getContext('2d')
   if (!context) throw new Error('OCR rasterize: no 2d context')
-  await page.render({ canvas, viewport }).promise
+  await track(pdf, () => page.render({ canvas, viewport }).promise)
   return createImageBitmap(canvas)
 }
 

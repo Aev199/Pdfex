@@ -1,6 +1,5 @@
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 
-export const BASE_RASTER = 1100
 export const MAX_DETAIL = 4096
 
 export const dpr = (): number => Math.min(window.devicePixelRatio || 1, 2)
@@ -18,6 +17,12 @@ interface BaseParams {
   pageNumber: number
   naturalWidth: number
   naturalHeight: number
+  // Long side of the raster in device pixels.
+  longSide: number
+  // Drop pdf.js's decoded images and parsed content for this page once drawn.
+  // Worth it for small thumbnails (a scan keeps megabytes per page decoded);
+  // not for a large page being looked at, which the next detail pass reuses.
+  cleanupAfter: boolean
   baseRef: React.RefObject<HTMLCanvasElement | null>
   isCancelled: () => boolean
   onTask: (task: RenderTask) => void
@@ -29,6 +34,8 @@ export async function renderBase({
   pageNumber,
   naturalWidth,
   naturalHeight,
+  longSide,
+  cleanupAfter,
   baseRef,
   isCancelled,
   onTask,
@@ -36,14 +43,18 @@ export async function renderBase({
 }: BaseParams): Promise<void> {
   const page = await pdf.getPage(pageNumber)
   if (isCancelled()) return
-  const scale = BASE_RASTER / Math.max(naturalWidth, naturalHeight)
+  const scale = longSide / Math.max(naturalWidth, naturalHeight)
   const viewport = page.getViewport({ scale })
   const off = document.createElement('canvas')
   off.width = Math.max(1, Math.floor(viewport.width))
   off.height = Math.max(1, Math.floor(viewport.height))
   const task = page.render({ canvas: off, viewport })
   onTask(task)
-  await task.promise
+  try {
+    await task.promise
+  } finally {
+    if (cleanupAfter) page.cleanup()
+  }
   if (isCancelled()) return
   const canvas = baseRef.current
   if (!canvas) return

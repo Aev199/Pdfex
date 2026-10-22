@@ -6,6 +6,9 @@ import type { DocEntry, PageEntry } from '../types'
 // Shared by every workspace, so a page copied in one tab pastes into another.
 const clipboardRef: { current: PageEntry | null } = { current: null }
 
+// The source of the copied page must stay loaded while it can be pasted.
+export const clipboardSourceId = (): string | null => clipboardRef.current?.source.id ?? null
+
 export function useClipboard(
   docs: DocEntry[],
   selected: PageRef | null,

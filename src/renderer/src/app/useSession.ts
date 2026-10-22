@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { restoreSession, serializeSession } from './session'
 import type { Restored } from './session'
 import { safeFileName } from './useExport'
+import { liveSourceIds } from './live-sources'
+import { releaseUnused } from '../pdfx/source-registry'
 import type { Workspace, WorkspaceSnapshot } from './workspaces'
 import type { LoadedSession } from '../../../preload'
 
@@ -58,7 +60,10 @@ export function useSession({ tabsRef, liveSnapshot, adopt, flash }: SessionDeps)
     if (!readyRef.current) return
     if (timer.current) window.clearTimeout(timer.current)
     timer.current = null
-    const { manifest, blobSources } = serializeSession(snapshotAll(), tabsRef.current.activeId)
+    const all = snapshotAll()
+    // Close documents nothing can show any more (removed, closed tabs).
+    releaseUnused(liveSourceIds(all.map((w) => w.snapshot)))
+    const { manifest, blobSources } = serializeSession(all, tabsRef.current.activeId)
     const blobs: Record<string, Uint8Array> = {}
     for (const source of blobSources) {
       if (!storedBlobs.current.has(source.id) && source.bytes) blobs[source.id] = source.bytes

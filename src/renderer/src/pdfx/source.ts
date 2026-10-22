@@ -3,6 +3,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { partitionPages, readManifest, stripExtension } from './format'
 import { findConverter } from './convert'
 import { isWeb } from '../platform/web/install'
+import { registerSource } from './source-registry'
 import type { DocEntry, PageEntry, PdfSource } from '../types'
 import type { Mark } from '../edit/types'
 import type { SourceExportPage } from './format'
@@ -62,6 +63,7 @@ export async function loadSource(bytes: Uint8Array, meta?: SourceMeta): Promise<
     mtimeMs: meta?.mtimeMs,
     pristine: meta?.pristine
   }
+  registerSource(source)
   const sizes: PageSize[] = []
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)

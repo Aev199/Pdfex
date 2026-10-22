@@ -3,6 +3,7 @@ import type { Mark } from '../edit/types'
 import type { PageEntry } from '../types'
 import type { RasterExportPage } from './format'
 import { openPdf } from './source'
+import { track } from './pdf-activity'
 
 const TARGET_PIXELS = 2200
 const MIN_SCALE = 1
@@ -40,7 +41,7 @@ async function render(
   if (!ctx) throw new Error('Canvas 2D context unavailable')
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
-  await page.render({ canvas, viewport }).promise
+  await track(pdf, () => page.render({ canvas, viewport }).promise)
   for (const mark of marks) {
     ctx.globalCompositeOperation = mark.kind === 'highlight' ? 'multiply' : 'source-over'
     ctx.fillStyle = MARK_COLORS[mark.color]

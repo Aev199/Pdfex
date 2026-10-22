@@ -143,8 +143,11 @@ export function WorkspaceView({
     [docs, collection.selected, fullViewState.hiddenPageId]
   )
   const aiActivity = useAiActivity()
-  const { getOcrWords, ocrStatus } = searchIndex
-  const aiOcr = useMemo(() => ({ getOcrWords, ocrStatus }), [getOcrWords, ocrStatus])
+  const { getOcrWords, ocrStatus, activateOcr } = searchIndex
+  const aiOcr = useMemo(
+    () => ({ getOcrWords, ocrStatus, activateOcr }),
+    [getOcrWords, ocrStatus, activateOcr]
+  )
   const aiBridge = useAiBridge(collection, elementState, formState, markState, aiOcr, aiFocus)
   const trackedAiBridge = useMemo(
     () => withActivity(aiBridge, aiActivity.tracker),
@@ -158,6 +161,10 @@ export function WorkspaceView({
   }, [aiBusy, clearAiActivity])
 
   const find = useFind(searchIndex.search, searchIndex.version)
+  // Scanned pages are recognized once the user starts searching.
+  useEffect(() => {
+    if (find.open) activateOcr()
+  }, [find.open, activateOcr])
   const findState = useMemo(
     () => ({
       active: find.active,

@@ -29,6 +29,8 @@ export interface SearchEngine {
   setLanguage: (lang: string) => void
   getOcrWords: (sourceKey: string) => OcrWord[] | undefined
   ocrStatus: (sourceKey: string) => OcrStatus
+  // Start recognizing scanned pages (until then they are only queued).
+  activateOcr: () => void
   dispose: () => void
 }
 
@@ -69,6 +71,9 @@ export function createSearchEngine({
   const pagesBySource = new Map<string, Set<string>>()
   const sourceRef = new Map<string, OcrJob>()
 
+  // OCR is CPU- and memory-heavy (a 400-page scan keeps two recognizers busy
+  // for minutes), so it waits until someone actually searches or asks.
+  let ocrActive = false
   let ocrInFlight = 0
   let jobSeq = 0
   let lang = DEFAULT_OCR_LANGUAGE
@@ -112,6 +117,7 @@ export function createSearchEngine({
   }
 
   function pumpOcr(): void {
+    if (!ocrActive) return
     while (ocrInFlight < OCR_CONCURRENCY && ocrQueue.length > 0) {
       const job = ocrQueue.shift()!
       ocrInFlight++
@@ -320,6 +326,12 @@ export function createSearchEngine({
       if (sourceOcrWords.has(sourceKey)) return 'done'
       if (scanned.has(sourceKey)) return 'pending'
       return sourceBorn.has(sourceKey) ? 'none' : 'unknown'
+    },
+
+    activateOcr() {
+      if (ocrActive) return
+      ocrActive = true
+      pumpOcr()
     },
 
     dispose() {
