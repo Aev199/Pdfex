@@ -1,5 +1,5 @@
 import { uniqueDocName } from '../names'
-import type { DocEntry, PageEntry } from '../../types'
+import type { DocEntry, PageEntry, PdfSource } from '../../types'
 import type { PageRef } from '../types'
 
 // Operations on a set of selected pages and on whole documents. Pure: they
@@ -140,3 +140,36 @@ export function pageRange(docs: DocEntry[], anchor: PageRef, target: PageRef): P
 
 export const allPages = (docs: DocEntry[]): PageRef[] =>
   docs.flatMap((d) => d.pages.map((p) => ({ docId: d.id, pageId: p.id })))
+
+// Point every page of `oldId` at `next` (a re-read of the same file after it
+// changed on disk). Page ids stay, so their annotations stay. Pages past the
+// new end disappear; a document that showed the whole old file in order
+// also gains the pages the file grew by.
+export function swapSource(
+  docs: DocEntry[],
+  oldId: string,
+  next: PdfSource,
+  sizes: { width: number; height: number }[]
+): DocEntry[] {
+  const count = sizes.length
+  const result = docs.map((doc) => {
+    if (!doc.pages.some((p) => p.source.id === oldId)) return doc
+    const whole =
+      doc.pages.length > 0 &&
+      doc.pages.every((p, i) => p.source.id === oldId && p.pageIndex === i) &&
+      doc.pages.length === doc.pages[0].source.pdf.numPages
+    const pages: PageEntry[] = []
+    for (const page of doc.pages) {
+      if (page.source.id !== oldId) pages.push(page)
+      else if (page.pageIndex < count)
+        pages.push({ ...page, source: next, ...sizes[page.pageIndex] })
+    }
+    if (whole) {
+      for (let i = doc.pages.length; i < count; i++) {
+        pages.push({ id: crypto.randomUUID(), source: next, pageIndex: i, ...sizes[i] })
+      }
+    }
+    return { ...doc, pages }
+  })
+  return result.filter((d) => d.pages.length > 0)
+}

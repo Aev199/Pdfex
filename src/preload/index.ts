@@ -21,6 +21,29 @@ export type OpenAction =
 
 export type OpenSource = { path: string } | { bytes: Uint8Array; name: string }
 
+export interface SessionSourceRecord {
+  id: string
+  path?: string
+  relPath?: string
+  byteLength: number
+  mtimeMs?: number
+  blob?: boolean
+}
+
+export interface SessionManifest {
+  format: 'pdfx-session'
+  version: number
+  sources: SessionSourceRecord[]
+  [key: string]: unknown
+}
+
+export interface LoadedSession {
+  manifest: SessionManifest
+  bytes: Record<string, Uint8Array>
+  status: Record<string, 'ok' | 'changed' | 'missing'>
+  found: Record<string, { path: string; mtimeMs: number }>
+}
+
 export interface FileStamp {
   size: number
   mtimeMs: number
@@ -37,6 +60,8 @@ export type MenuAction =
   | 'close-tab'
   | 'next-tab'
   | 'previous-tab'
+  | 'save-session'
+  | 'save-tab'
 
 export interface SaveFilter {
   name: string
@@ -64,6 +89,22 @@ const api = {
     ipcRenderer.invoke('pdfx:file-info', path),
   statSources: (paths: string[]): Promise<(FileStamp | null)[]> =>
     ipcRenderer.invoke('pdfx:stat-sources', paths),
+  sessionLoad: (): Promise<LoadedSession | null> => ipcRenderer.invoke('pdfx:session-load'),
+  sessionSave: (manifest: SessionManifest, blobs: Record<string, Uint8Array>): Promise<void> =>
+    ipcRenderer.invoke('pdfx:session-save', manifest, blobs),
+  sessionWriteFile: (
+    path: string,
+    manifest: SessionManifest,
+    blobs: Record<string, Uint8Array>
+  ): Promise<void> => ipcRenderer.invoke('pdfx:session-write-file', path, manifest, blobs),
+  sessionOpenFile: (path: string): Promise<LoadedSession> =>
+    ipcRenderer.invoke('pdfx:session-open-file', path),
+  onFlushSession: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('pdfx:flush-session', listener)
+    return () => ipcRenderer.removeListener('pdfx:flush-session', listener)
+  },
+  sessionFlushed: (): void => ipcRenderer.send('pdfx:session-flushed'),
   listExternalApps: (): Promise<ExternalApp[]> => ipcRenderer.invoke('pdfx:list-external-apps'),
   openExternal: (action: OpenAction, source: OpenSource): Promise<void> =>
     ipcRenderer.invoke('pdfx:open-external', action, source),

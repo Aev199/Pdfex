@@ -32,9 +32,7 @@ export function useCollection(
   // `selected` is the page last clicked (keyboard and paste target);
   // `selection` is every highlighted page and always includes it.
   const [selected, setSelectedState] = useState<PageRef | null>(initial?.selected ?? null)
-  const [selection, setSelection] = useState<PageRef[]>(
-    initial?.selected ? [initial.selected] : []
-  )
+  const [selection, setSelection] = useState<PageRef[]>(initial?.selected ? [initial.selected] : [])
   const docsRef = useRef(docs)
   docsRef.current = docs
   const selectedRef = useRef(selected)
@@ -195,10 +193,11 @@ export function useCollection(
   }, [currentSelection, deletePage, setDocs, setSelected])
 
   const duplicateSelection = useCallback((): Map<string, string> => {
-    const { docs: next, origins, created } = selOps.duplicatePages(
-      docsRef.current,
-      currentSelection()
-    )
+    const {
+      docs: next,
+      origins,
+      created
+    } = selOps.duplicatePages(docsRef.current, currentSelection())
     setDocs(next)
     if (created.length > 0) {
       setSelection(created)
@@ -233,6 +232,13 @@ export function useCollection(
       if (selectedRef.current?.docId === docId) setSelected(null)
     },
     [setDocs, setSelected]
+  )
+
+  const swapSource = useCallback(
+    (oldId: string, next: PdfSource, sizes: { width: number; height: number }[]) => {
+      setDocs((prev) => selOps.swapSource(prev, oldId, next, sizes))
+    },
+    [setDocs]
   )
 
   const insertPagesAfter = useCallback(
@@ -379,6 +385,7 @@ export function useCollection(
     extractSelection,
     splitDocAt,
     replaceDocPages,
+    swapSource,
     copySelected,
     pasteAfterSelected,
     insertPagesAfter,

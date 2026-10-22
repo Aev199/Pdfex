@@ -7,6 +7,7 @@ import { carryDocs, newWorkspace, uniqueTabName } from './app/workspaces'
 import type { Workspace, WorkspaceSnapshot } from './app/workspaces'
 import type { DocsUpdate } from './app/useCollection'
 import type { DocEntry } from './types'
+import { useSession } from './app/useSession'
 
 interface Tabs {
   workspaces: Workspace[]
@@ -26,6 +27,7 @@ export default function App(): React.JSX.Element {
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
   const viewRef = useRef<WorkspaceViewHandle | null>(null)
+  const flash = useCallback((message: string) => viewRef.current?.flash(message), [])
 
   // The active workspace's snapshot in `tabs` goes stale while it's mounted;
   // read the live one from the view whenever it matters.
@@ -51,6 +53,39 @@ export default function App(): React.JSX.Element {
     },
     [liveSnapshot]
   )
+
+  const adopt = useCallback(
+    (workspaces: Workspace[], activeId: string | null, mode: 'replace' | 'append') => {
+      if (mode === 'replace') {
+        const active = workspaces.some((w) => w.id === activeId) ? activeId! : workspaces[0].id
+        setTabs({ workspaces, activeId: active })
+        return
+      }
+      leaveActive((t) => {
+        // A lone empty tab is just the startup placeholder: replace it.
+        const keep =
+          t.workspaces.length === 1 &&
+          t.workspaces[0].snapshot.docs.length === 0 &&
+          t.workspaces[0].snapshot.missing.length === 0
+            ? []
+            : t.workspaces
+        const taken = keep.map((w) => w.name)
+        const added = workspaces.map((w) => {
+          const name = uniqueTabName(w.name, taken)
+          taken.push(name)
+          return { ...w, name }
+        })
+        return { workspaces: [...keep, ...added], activeId: activeId ?? added[0].id }
+      })
+    },
+    [leaveActive]
+  )
+
+  const session = useSession({ tabsRef, liveSnapshot, adopt, flash })
+  const { scheduleSave } = session
+  useEffect(() => {
+    scheduleSave()
+  }, [tabs, scheduleSave])
 
   const selectTab = useCallback(
     (id: string) => {
@@ -79,8 +114,7 @@ export default function App(): React.JSX.Element {
         if (index === -1) return t
         const rest = t.workspaces.filter((w) => w.id !== id)
         if (rest.length === 0) return initialTabs()
-        const activeId =
-          t.activeId === id ? rest[Math.min(index, rest.length - 1)].id : t.activeId
+        const activeId = t.activeId === id ? rest[Math.min(index, rest.length - 1)].id : t.activeId
         return { workspaces: rest, activeId }
       })
     },
@@ -113,44 +147,39 @@ export default function App(): React.JSX.Element {
 
   // Move documents out of the active workspace into another one (or a new
   // tab when targetId is null), keeping their annotations and form values.
-  const moveDocsToTab = useCallback(
-    (docIds: string[], targetId: string | null) => {
-      const view = viewRef.current
-      const current = tabsRef.current
-      const active = current.workspaces.find((w) => w.id === current.activeId)
-      if (!view || !active || targetId === active.id) return
-      const snap = view.snapshot()
-      const ids = new Set(docIds)
-      const moving = snap.docs.filter((d) => ids.has(d.id))
-      if (moving.length === 0) return
-      view.removeDocs(docIds)
-      setTabs((t) => {
-        if (targetId === null) {
-          const ws = newWorkspace(
-            uniqueTabName(
-              moving.length === 1 ? moving[0].name : 'Tab 1',
-              t.workspaces.map((w) => w.name)
-            )
+  const moveDocsToTab = useCallback((docIds: string[], targetId: string | null) => {
+    const view = viewRef.current
+    const current = tabsRef.current
+    const active = current.workspaces.find((w) => w.id === current.activeId)
+    if (!view || !active || targetId === active.id) return
+    const snap = view.snapshot()
+    const ids = new Set(docIds)
+    const moving = snap.docs.filter((d) => ids.has(d.id))
+    if (moving.length === 0) return
+    view.removeDocs(docIds)
+    setTabs((t) => {
+      if (targetId === null) {
+        const ws = newWorkspace(
+          uniqueTabName(
+            moving.length === 1 ? moving[0].name : 'Tab 1',
+            t.workspaces.map((w) => w.name)
           )
-          ws.snapshot = carryDocs(snap, ws.snapshot, moving)
-          return { ...t, workspaces: [...t.workspaces, ws] }
-        }
-        return {
-          ...t,
-          workspaces: t.workspaces.map((w) =>
-            w.id === targetId ? { ...w, snapshot: carryDocs(snap, w.snapshot, moving) } : w
-          )
-        }
-      })
-      const target = targetId
-        ? current.workspaces.find((w) => w.id === targetId)?.name
-        : 'a new tab'
-      view.flash(
-        `Moved ${moving.length === 1 ? `"${moving[0].name}"` : `${moving.length} documents`} to ${target}`
-      )
-    },
-    []
-  )
+        )
+        ws.snapshot = carryDocs(snap, ws.snapshot, moving)
+        return { ...t, workspaces: [...t.workspaces, ws] }
+      }
+      return {
+        ...t,
+        workspaces: t.workspaces.map((w) =>
+          w.id === targetId ? { ...w, snapshot: carryDocs(snap, w.snapshot, moving) } : w
+        )
+      }
+    })
+    const target = targetId ? current.workspaces.find((w) => w.id === targetId)?.name : 'a new tab'
+    view.flash(
+      `Moved ${moving.length === 1 ? `"${moving[0].name}"` : `${moving.length} documents`} to ${target}`
+    )
+  }, [])
 
   // A slow import that finishes after its tab was switched away from still
   // lands in that tab.
@@ -184,8 +213,10 @@ export default function App(): React.JSX.Element {
         }
       } else if (action === 'next-tab') cycleTab(1)
       else if (action === 'previous-tab') cycleTab(-1)
+      else if (action === 'save-session') void session.saveSessionAs()
+      else if (action === 'save-tab') session.saveTabAs(tabsRef.current.activeId)
     })
-  }, [addTab, closeTab, cycleTab])
+  }, [addTab, closeTab, cycleTab, session])
 
   const active = tabs.workspaces.find((w) => w.id === tabs.activeId) ?? tabs.workspaces[0]
   const docCount = useCallback(
@@ -205,9 +236,14 @@ export default function App(): React.JSX.Element {
       onClose={closeTab}
       onRename={renameTab}
       onRecolor={recolorTab}
+      onSaveTab={session.saveTabAs}
       docCount={docCount}
     />
   )
+
+  // Nothing renders until the previous session is back, so files opened from
+  // the command line land in the restored tabs instead of being replaced.
+  if (!session.ready) return <div className="app" />
 
   return (
     <ContextMenuProvider>
@@ -220,6 +256,8 @@ export default function App(): React.JSX.Element {
         activeWorkspaceId={active.id}
         onMoveDocsToTab={moveDocsToTab}
         onDetachedUpdate={detachedUpdate(active.id)}
+        onChange={scheduleSave}
+        onOpenSession={session.openSessionFile}
       />
     </ContextMenuProvider>
   )

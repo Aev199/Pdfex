@@ -13,7 +13,6 @@ export function useClipboard(
   setSelected: (sel: PageRef | null) => void,
   flash: (message: string) => void
 ) {
-
   const copySelected = useCallback(() => {
     if (!selected) return
     const page = docs

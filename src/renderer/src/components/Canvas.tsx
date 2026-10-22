@@ -90,7 +90,9 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     hadContentRef.current = hasContent
   }, [contentWidth, contentHeight])
 
-  useImperativeHandle(ref, () => createCanvasHandle({ viewportRef, zoomRef, animatorRef, fitTransform }))
+  useImperativeHandle(ref, () =>
+    createCanvasHandle({ viewportRef, zoomRef, animatorRef, fitTransform })
+  )
 
   return (
     <div

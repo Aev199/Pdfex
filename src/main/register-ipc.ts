@@ -9,6 +9,8 @@ import { readResource } from './resource'
 import { fileInfo, readSource, statSource } from './source-files'
 import { listExternalApps, openExternal, resolveFile } from './open-with'
 import type { OpenAction, OpenSource } from './open-with'
+import { loadAutosave, openSessionFile, saveSession, writeSessionFile } from './session'
+import type { SessionManifest } from './session'
 import { getMainWindow, setRendererReady, sendOpenPaths } from './window'
 
 const MAX_WRITE_BYTES = 1024 * 1024 * 1024 // 1 GiB cap on a single IPC write
@@ -60,6 +62,22 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
   ipcMain.handle('pdfx:stat-sources', (_event, paths: unknown) =>
     Array.isArray(paths) ? Promise.all(paths.slice(0, 10_000).map(statSource)) : []
   )
+
+  ipcMain.handle('pdfx:session-load', () => loadAutosave())
+
+  ipcMain.handle(
+    'pdfx:session-save',
+    (_event, manifest: SessionManifest, blobs: Record<string, Uint8Array>) =>
+      saveSession(manifest, blobs ?? {})
+  )
+
+  ipcMain.handle(
+    'pdfx:session-write-file',
+    (_event, path: string, manifest: SessionManifest, blobs: Record<string, Uint8Array>) =>
+      writeSessionFile(path, manifest, blobs ?? {})
+  )
+
+  ipcMain.handle('pdfx:session-open-file', (_event, path: unknown) => openSessionFile(path))
 
   ipcMain.handle('pdfx:list-external-apps', () => listExternalApps())
 
@@ -122,6 +140,7 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
           extensions: [
             'pdf',
             'pdfx',
+            'pdfxs',
             'png',
             'jpg',
             'jpeg',

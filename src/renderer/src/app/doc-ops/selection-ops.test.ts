@@ -5,7 +5,8 @@ import {
   duplicatePages,
   extractPages,
   pageRange,
-  splitDocAt
+  splitDocAt,
+  swapSource
 } from './selection-ops'
 import type { DocEntry, PageEntry, PdfSource } from '../../types'
 
@@ -58,5 +59,33 @@ describe('selection ops', () => {
       'a3',
       'b1'
     ])
+  })
+})
+
+describe('swapSource', () => {
+  const old = { id: 'old', pdf: { numPages: 3 } } as unknown as PdfSource
+  const next = { id: 'new', pdf: { numPages: 4 } } as unknown as PdfSource
+  const pg = (id: string, i: number, src = old): PageEntry => ({
+    id,
+    source: src,
+    pageIndex: i,
+    width: 1,
+    height: 1
+  })
+  const sizes = (n: number) => Array.from({ length: n }, () => ({ width: 2, height: 3 }))
+
+  it('keeps page ids and appends growth to a whole-file document', () => {
+    const docs = [{ id: 'D', name: 'D', pages: [pg('p0', 0), pg('p1', 1), pg('p2', 2)] }]
+    const out = swapSource(docs, 'old', next, sizes(4))
+    expect(out[0].pages.map((p) => p.id).slice(0, 3)).toEqual(['p0', 'p1', 'p2'])
+    expect(out[0].pages).toHaveLength(4)
+    expect(out[0].pages.every((p) => p.source === next && p.width === 2)).toBe(true)
+  })
+
+  it('drops pages past the new end and leaves other sources alone', () => {
+    const other = { id: 'x' } as PdfSource
+    const docs = [{ id: 'D', name: 'D', pages: [pg('p2', 2), pg('q', 0, other), pg('p0', 0)] }]
+    const out = swapSource(docs, 'old', next, sizes(2))
+    expect(out[0].pages.map((p) => p.id)).toEqual(['q', 'p0'])
   })
 })

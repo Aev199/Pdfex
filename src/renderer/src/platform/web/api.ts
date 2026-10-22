@@ -18,6 +18,14 @@ export function createWebApi(): PdfxApi {
     getPathForFile: () => '',
     expandDropPaths: async () => [],
     readSource: async () => null,
+    sessionLoad: async () => null,
+    sessionSave: async () => {},
+    sessionWriteFile: async () => {},
+    sessionOpenFile: async () => {
+      throw new Error('Sessions are not available on the web')
+    },
+    onFlushSession: () => () => {},
+    sessionFlushed: () => {},
     fileInfo: async () => null,
     listExternalApps: async () => [],
     openExternal: async () => {},

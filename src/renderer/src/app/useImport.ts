@@ -10,14 +10,19 @@ import type { IncomingFile, PendingImport } from './types'
 export function useImport(
   collection: Collection,
   setBusy: (busy: boolean) => void,
-  flash: (message: string) => void
+  flash: (message: string) => void,
+  onOpenSession: (path: string) => void
 ) {
   const { setDocs, docsRef, appendPagesToDoc, insertPagesIntoDoc, spliceDocsAfter } = collection
   const { replaceDocPages } = collection
   const [pending, setPending] = useState<PendingImport[]>([])
 
   const addFiles = useCallback(
-    async (files: IncomingFile[]) => {
+    async (incoming: IncomingFile[]) => {
+      // Session files open as tabs rather than as documents.
+      const sessions = incoming.filter((f) => /\.pdfxs$/i.test(f.name) && f.path)
+      for (const file of sessions) onOpenSession(file.path!)
+      const files = incoming.filter((f) => !sessions.includes(f))
       if (files.length === 0) return
       setBusy(true)
       // Every file gets a placeholder row at once; each turns into its
@@ -53,7 +58,7 @@ export function useImport(
       setBusy(false)
       if (failed.length > 0) flash(`Could not open ${failed.join(', ')}`)
     },
-    [flash, setBusy, setDocs]
+    [flash, setBusy, setDocs, onOpenSession]
   )
 
   useEffect(() => {

@@ -35,6 +35,12 @@ import { StatusRibbon } from './components/StatusRibbon'
 import { useDocInfo } from './app/useDocInfo'
 import { useOpenWith } from './app/useOpenWith'
 import { useContextMenu } from './app/context-menu'
+import { useSourceWatch } from './app/useSourceWatch'
+import { NoticeBar } from './components/NoticeBar'
+import type { Notice } from './components/NoticeBar'
+import { relinkPages } from './app/session'
+import { loadSource, fileMeta } from './pdfx/source'
+import type { MissingDoc } from './app/workspaces'
 import type { ContextMenuItem } from './components/ContextMenu'
 import type { DocsUpdate } from './app/useCollection'
 import type { Workspace, WorkspaceSnapshot } from './app/workspaces'
@@ -60,6 +66,10 @@ interface WorkspaceViewProps {
   onMoveDocsToTab: (docIds: string[], targetId: string | null) => void
   // Document updates that arrive after this view was switched away from.
   onDetachedUpdate: (update: DocsUpdate) => void
+  // Something worth autosaving changed.
+  onChange: () => void
+  // A .pdfxs session file was opened.
+  onOpenSession: (path: string) => void
 }
 
 export function WorkspaceView({
@@ -69,7 +79,9 @@ export function WorkspaceView({
   workspaces,
   activeWorkspaceId,
   onMoveDocsToTab,
-  onDetachedUpdate
+  onDetachedUpdate,
+  onChange,
+  onOpenSession
 }: WorkspaceViewProps): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   // Zoom ticks arrive ~11x/s while zooming; keep them out of App state so
@@ -91,6 +103,9 @@ export function WorkspaceView({
   const formState = useFormValues(initial.formValues)
   const elementState = useElements(undoStack.push, initial.elements, initial.nextElementNumber)
   const collection = useCollection(flash, undoStack.push, initial, onDetachedUpdate)
+  const [missing, setMissing] = useState<MissingDoc[]>(initial.missing)
+  const missingRef = useRef(missing)
+  missingRef.current = missing
 
   useImperativeHandle(
     handleRef,
@@ -103,7 +118,8 @@ export function WorkspaceView({
         nextElementNumber: elementState.nextNumberRef.current,
         undo: undoStack.snapshot(),
         view: canvasRef.current?.getView() ?? initial.view,
-        selected: collection.selectedRef.current
+        selected: collection.selectedRef.current,
+        missing: missingRef.current
       }),
       removeDocs: (docIds) => {
         const ids = new Set(docIds)
@@ -153,6 +169,93 @@ export function WorkspaceView({
     [find.active, find.matchedQuery, find.result, searchIndex.getOcrWords]
   )
 
+  // Autosave whenever the content of this workspace changes.
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  useEffect(() => {
+    onChangeRef.current()
+  }, [docs, markState.marks, elementState.elements, formState.values, missing])
+
+  const sourceWatch = useSourceWatch(docs, collection.swapSource, flash)
+
+  // Bring back pages whose file went missing, from a file the user picks.
+  // Every missing entry that pointed at the same file is relinked at once.
+  const { setDocs: setDocsForRelink } = collection
+  const relink = useCallback(
+    async (entry: MissingDoc) => {
+      const [file] = await window.api.openFiles()
+      if (!file) return
+      try {
+        const { source } = await loadSource(file.data, fileMeta(file, false))
+        const matching = missingRef.current.filter((m) => m.source.id === entry.source.id)
+        setDocsForRelink((prev) => {
+          let next = prev
+          for (const m of matching) {
+            const pages = relinkPages(m, source)
+            if (pages.length === 0) continue
+            next = next.some((d) => d.id === m.doc.id)
+              ? next.map((d) => (d.id === m.doc.id ? { ...d, pages: [...d.pages, ...pages] } : d))
+              : [
+                  ...next.slice(0, m.index ?? next.length),
+                  { id: m.doc.id, name: m.doc.name, pages },
+                  ...next.slice(m.index ?? next.length)
+                ]
+          }
+          return next
+        })
+        setMissing((prev) => prev.filter((m) => m.source.id !== entry.source.id))
+        if (file.data.byteLength !== entry.source.byteLength) {
+          flash(`${file.name} differs from the original file; check the pages`)
+        }
+      } catch (error) {
+        console.error('Relink failed', error)
+        flash(`Could not open ${file.name}`)
+      }
+    },
+    [setDocsForRelink, flash]
+  )
+
+  const notices = useMemo((): Notice[] => {
+    const list: Notice[] = missing.map((m) => ({
+      id: `missing:${m.source.id}:${m.doc.id}`,
+      text: `"${m.doc.name}": file not found (${m.doc.pages.length} ${m.doc.pages.length === 1 ? 'page' : 'pages'})`,
+      detail: m.source.path,
+      actions: [
+        { label: 'Locate…', primary: true, onClick: () => void relink(m) },
+        {
+          label: 'Remove',
+          onClick: () => setMissing((prev) => prev.filter((x) => x !== m))
+        }
+      ]
+    }))
+    for (const change of sourceWatch.changes) {
+      const name = change.source.path!.split(/[\\/]/).pop()
+      list.push(
+        change.kind === 'changed'
+          ? {
+              id: `changed:${change.source.id}`,
+              text: `${name} was changed by another program`,
+              detail: change.source.path,
+              actions: [
+                {
+                  label: 'Reload',
+                  primary: true,
+                  onClick: () => void sourceWatch.reload(change.source)
+                },
+                { label: 'Keep current', onClick: () => void sourceWatch.ignore(change.source) }
+              ]
+            }
+          : {
+              id: `gone:${change.source.id}`,
+              text: `${name} was moved or deleted; its pages stay open but can't be exported`,
+              detail: change.source.path,
+              actions: [{ label: 'OK', onClick: () => void sourceWatch.ignore(change.source) }]
+            }
+      )
+    }
+    return list
+  }, [missing, sourceWatch, relink])
+
   const { exportCollection, exportPages, exportZip, buildPagesPdf, hasEdits } = useExport(
     docs,
     markState.marks,
@@ -168,7 +271,7 @@ export function WorkspaceView({
     handleExternalDropFiles,
     replaceDoc,
     pendingImports
-  } = useImport(collection, setBusy, flash)
+  } = useImport(collection, setBusy, flash, onOpenSession)
   const layout = useMemo(
     () => computeLayout(docs, pendingImports.length),
     [docs, pendingImports.length]
@@ -209,8 +312,7 @@ export function WorkspaceView({
   }, [popRedo, applyMarkRedo, applyElementRedo, applyPageSource, applyDocs, placePageAt])
 
   // Duplicates carry the marks and elements of their originals.
-  const { duplicateSelection: duplicatePageSelection, duplicateDoc: duplicateWholeDoc } =
-    collection
+  const { duplicateSelection: duplicatePageSelection, duplicateDoc: duplicateWholeDoc } = collection
   const { copyToPages: copyMarks } = markState
   const { copyToPages: copyElements } = elementState
   const duplicateSelection = useCallback(() => {
@@ -288,7 +390,10 @@ export function WorkspaceView({
     (docIds: string[]): ContextMenuItem[] => [
       ...workspaces
         .filter((w) => w.id !== activeWorkspaceId)
-        .map((w) => ({ label: w.name || 'Untitled tab', onClick: () => onMoveDocsToTab(docIds, w.id) })),
+        .map((w) => ({
+          label: w.name || 'Untitled tab',
+          onClick: () => onMoveDocsToTab(docIds, w.id)
+        })),
       ...(workspaces.length > 1 ? [{ separator: true }] : []),
       { label: 'New tab', onClick: () => onMoveDocsToTab(docIds, null) }
     ],
@@ -386,7 +491,11 @@ export function WorkspaceView({
   })
 
   const onScaleChange = useCallback((next: number) => zoomStore.set(next), [zoomStore])
-  const onSettle = useCallback(() => setRenderVersion((v) => v + 1), [])
+  const onSettle = useCallback(() => {
+    setRenderVersion((v) => v + 1)
+    // The camera position is part of the saved session.
+    onChangeRef.current()
+  }, [])
 
   const fullViewRef = fullViewState.fullViewRef
   useEffect(() => {
@@ -536,6 +645,8 @@ export function WorkspaceView({
               }}
             />
           )}
+
+          <NoticeBar notices={notices} />
 
           <StatusRibbon info={hoveredInfo} />
 

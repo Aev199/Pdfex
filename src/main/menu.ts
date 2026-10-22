@@ -26,6 +26,13 @@ export function buildMenu(): void {
         { id: 'export-pdf', label: 'Export Single PDF…', click: sendMenu('export-pdf') },
         { id: 'export-zip', label: 'Export All as ZIP…', click: sendMenu('export-zip') },
         { type: 'separator' },
+        {
+          label: 'Save Session As…',
+          accelerator: 'CommandOrControl+Shift+S',
+          click: sendMenu('save-session')
+        },
+        { label: 'Save Tab As…', click: sendMenu('save-tab') },
+        { type: 'separator' },
         process.platform === 'darwin' ? { role: 'close' as const } : { role: 'quit' as const }
       ]
     },
@@ -75,7 +82,10 @@ export function buildMenu(): void {
     },
     {
       role: 'window',
-      submenu: [{ role: 'minimize' }, ...(process.platform === 'darwin' ? [{ role: 'zoom' as const }] : [])]
+      submenu: [
+        { role: 'minimize' },
+        ...(process.platform === 'darwin' ? [{ role: 'zoom' as const }] : [])
+      ]
     }
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))

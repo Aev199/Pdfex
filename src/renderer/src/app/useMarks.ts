@@ -91,7 +91,17 @@ export function useMarks(pushUndo: (entry: UndoEntry) => void, initial: MarkMap 
   const applyUndo = useCallback((entry: MarkUndoEntry) => applyEntry(entry, 'undo'), [applyEntry])
   const applyRedo = useCallback((entry: MarkUndoEntry) => applyEntry(entry, 'redo'), [applyEntry])
 
-  return { marks, marksRef, copyToPages, addMark, toggleMark, clearMarks, restoreMarks, applyUndo, applyRedo }
+  return {
+    marks,
+    marksRef,
+    copyToPages,
+    addMark,
+    toggleMark,
+    clearMarks,
+    restoreMarks,
+    applyUndo,
+    applyRedo
+  }
 }
 
 export type MarkState = ReturnType<typeof useMarks>

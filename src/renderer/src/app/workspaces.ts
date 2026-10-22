@@ -4,6 +4,8 @@ import type { ElementMap } from '../elements/types'
 import type { FormValuesBySource } from '../forms/types'
 import type { UndoEntry } from './undo'
 import type { PageRef } from './types'
+import type { SessionSourceRecord } from '../../../preload'
+import type { SessionDoc } from './session'
 
 // A WORKSPACE is one canvas-full of documents; a TAB is the chip that selects
 // it. Only the active workspace is mounted (rendered pages, search index,
@@ -22,6 +24,15 @@ export interface UndoSnapshot {
   cursor: number
 }
 
+// Pages of a restored document whose file was not found (moved, renamed,
+// on a drive that isn't connected). Kept until the user relinks or drops them.
+export interface MissingDoc {
+  doc: SessionDoc
+  source: SessionSourceRecord
+  // Where the document stood among the workspace's documents.
+  index?: number
+}
+
 export interface WorkspaceSnapshot {
   docs: DocEntry[]
   marks: MarkMap
@@ -31,6 +42,7 @@ export interface WorkspaceSnapshot {
   undo: UndoSnapshot
   view: CanvasView | null
   selected: PageRef | null
+  missing: MissingDoc[]
 }
 
 export interface Workspace {
@@ -49,7 +61,8 @@ export const emptySnapshot = (docs: DocEntry[] = []): WorkspaceSnapshot => ({
   nextElementNumber: 1,
   undo: { stack: [], cursor: 0 },
   view: null,
-  selected: null
+  selected: null,
+  missing: []
 })
 
 export function newWorkspace(name: string, docs: DocEntry[] = []): Workspace {
