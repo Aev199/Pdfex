@@ -3,6 +3,7 @@ import { zipSync } from 'fflate'
 import { buildPdf, buildPdfx, stripExtension } from '../pdfx/format'
 import { prepareExportPage } from '../pdfx/export-pages'
 import { fillDocSources } from '../forms/fill'
+import { SourceUnavailableError } from '../pdfx/source'
 import type { DocEntry } from '../types'
 import type { MarkMap } from '../edit/types'
 import type { FormValuesBySource } from '../forms/types'
@@ -54,7 +55,7 @@ export function useExport(
         flash(`Saved ${saved}`)
       } catch (error) {
         console.error('Export failed', error)
-        flash('Export failed')
+        flash(exportFailure(error))
       } finally {
         setBusy(false)
       }
@@ -85,7 +86,7 @@ export function useExport(
       flash(`Saved ${saved}`)
     } catch (error) {
       console.error('Export failed', error)
-      flash('Export failed')
+      flash(exportFailure(error))
     } finally {
       setBusy(false)
     }
@@ -93,3 +94,6 @@ export function useExport(
 
   return { exportCollection, exportZip }
 }
+
+const exportFailure = (error: unknown): string =>
+  error instanceof SourceUnavailableError ? `Export failed: ${error.message}` : 'Export failed'
