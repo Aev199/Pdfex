@@ -1,8 +1,11 @@
 import { _electron as electron } from 'playwright-core'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import electronPath from 'electron'
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url))
+// No trailing separator: on Windows a final backslash would escape the
+// closing quote of the argument and swallow the ones after it.
+const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)))
 
 // Launch the built app (out/) with its data folder pinned to `dataDir`.
 export async function launch(dataDir, files = []) {
