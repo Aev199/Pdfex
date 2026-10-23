@@ -105,7 +105,7 @@ async function pruneOld(dir: string): Promise<void> {
 // Best-effort wipe of the temp exports handed to other apps (startup/quit).
 export async function cleanupTempExports(): Promise<void> {
   const tmp = app.getPath('temp')
-  for (const dir of ['pdfx-open', 'pdfx-print']) {
+  for (const dir of ['pdfx-open', 'pdfx-print', 'pdfx-office']) {
     // Ignore failures: nothing to clean, or files locked by another app.
     await rm(join(tmp, dir), { recursive: true, force: true }).catch(() => {})
   }

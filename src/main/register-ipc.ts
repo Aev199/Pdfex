@@ -9,6 +9,7 @@ import { readResource } from './resource'
 import { fileInfo, readSource, statSource } from './source-files'
 import { listExternalApps, openExternal, resolveFile } from './open-with'
 import { runPrint, spoolPage } from './print'
+import { converterFor, officeConvert } from './office'
 import type { OpenAction, OpenSource } from './open-with'
 import { loadAutosave, openSessionFile, saveSession, writeSessionFile } from './session'
 import type { SessionManifest } from './session'
@@ -90,6 +91,14 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
     runPrint(id, String(title ?? 'PDFx'))
   )
 
+  ipcMain.handle('pdfx:office-converter', (_event, kind: unknown) =>
+    kind === 'word' || kind === 'excel' || kind === 'powerpoint' ? converterFor(kind) : null
+  )
+
+  ipcMain.handle('pdfx:office-convert', (_event, ext: string, data: Uint8Array) =>
+    officeConvert(ext, data)
+  )
+
   ipcMain.handle('pdfx:list-external-apps', () => listExternalApps())
 
   ipcMain.handle('pdfx:open-external', (_event, action: OpenAction, source: OpenSource) =>
@@ -152,6 +161,15 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
             'pdf',
             'pdfx',
             'pdfxs',
+            'doc',
+            'docx',
+            'odt',
+            'xls',
+            'xlsx',
+            'ods',
+            'ppt',
+            'pptx',
+            'odp',
             'png',
             'jpg',
             'jpeg',

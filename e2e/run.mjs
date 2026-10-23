@@ -301,6 +301,33 @@ test('reader: thumbnails, page jump, rotation and printing', async () => {
   }
 })
 
+test('an Office document converts to PDF, or says what to install', async () => {
+  const { app, page } = await launch(freshData(), [files.word])
+  try {
+    await page.waitForFunction(
+      () =>
+        document.querySelector('.doc-name') ||
+        /install Microsoft Word or LibreOffice|conversion to PDF failed/.test(
+          document.querySelector('.toast')?.textContent ?? ''
+        ),
+      null,
+      { timeout: 120_000 }
+    )
+    const names = await texts(page, '.doc-name')
+    if (names.length > 0) {
+      assert.deepEqual(names, ['Пояснительная записка'])
+      await rendered(page)
+    } else {
+      assert.match(
+        await page.locator('.toast').innerText(),
+        /install Microsoft Word or LibreOffice/
+      )
+    }
+  } finally {
+    await app.close()
+  }
+})
+
 let failed = 0
 for (const { name, fn } of tests) {
   const t0 = Date.now()

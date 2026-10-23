@@ -13,13 +13,13 @@ export interface OpenedFile {
   mtimeMs?: number
 }
 
-export const IMPORTABLE = /\.(pdf|pdfx|pdfxs|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
+export const IMPORTABLE = /\.(pdf|pdfx|pdfxs|docx?|odt|xlsx?|ods|pptx?|odp|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
 
-// PDFs named on a command line, made absolute against the directory that
+// Documents named on a command line (or dropped on pdfx.exe), made absolute against the directory that
 // command ran in (a second launch's cwd differs from ours).
 export function collectFileArgs(argv: string[], cwd = process.cwd()): string[] {
   return argv
-    .filter((arg) => /\.(pdf|pdfx|pdfxs)$/i.test(arg))
+    .filter((arg) => importable(arg))
     .map((arg) => resolve(cwd, arg))
     .filter((path) => existsSync(path))
 }

@@ -106,6 +106,11 @@ const api = {
     return () => ipcRenderer.removeListener('pdfx:flush-session', listener)
   },
   sessionFlushed: (): void => ipcRenderer.send('pdfx:session-flushed'),
+  officeConverter: (
+    kind: 'word' | 'excel' | 'powerpoint'
+  ): Promise<'office' | 'libreoffice' | null> => ipcRenderer.invoke('pdfx:office-converter', kind),
+  officeConvert: (ext: string, data: Uint8Array): Promise<Uint8Array> =>
+    ipcRenderer.invoke('pdfx:office-convert', ext, data),
   printSpool: (
     id: string,
     index: number,

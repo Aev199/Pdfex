@@ -4,6 +4,7 @@ import { PDFDocument, rgb } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { strToU8, zipSync } from 'fflate'
 
 const FONT = new URL('../node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf', import.meta.url)
 const WORDS = 'грунт суглинок песок скважина слой влажность плотность модуль деформации'.split(' ')
@@ -47,12 +48,35 @@ async function drawing() {
   return doc.save()
 }
 
+// The smallest Word document Word and LibreOffice will open.
+function docx(paragraphs) {
+  const body = paragraphs
+    .map((t) => `<w:p><w:r><w:t xml:space="preserve">${t}</w:t></w:r></w:p>`)
+    .join('')
+  return zipSync({
+    '[Content_Types].xml': strToU8(
+      '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'
+    ),
+    '_rels/.rels': strToU8(
+      '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'
+    ),
+    'word/document.xml': strToU8(
+      `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}</w:body></w:document>`
+    )
+  })
+}
+
 export async function makeFixtures(dir) {
   const files = {
     report: join(dir, 'Технический отчёт ИГИ.pdf'),
     drawing: join(dir, 'КЖ лист 1.pdf'),
-    second: join(dir, 'Расчёт MIDAS.pdf')
+    second: join(dir, 'Расчёт MIDAS.pdf'),
+    word: join(dir, 'Пояснительная записка.docx')
   }
+  writeFileSync(
+    files.word,
+    docx(['Пояснительная записка', 'Расчётное сопротивление грунта R = 250 кПа'])
+  )
   writeFileSync(files.report, await report(12, 'Технический отчёт'))
   writeFileSync(files.drawing, await drawing())
   writeFileSync(files.second, await report(3, 'Расчётный отчёт'))

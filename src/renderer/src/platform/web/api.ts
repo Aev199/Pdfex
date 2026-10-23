@@ -18,6 +18,10 @@ export function createWebApi(): PdfxApi {
     getPathForFile: () => '',
     expandDropPaths: async () => [],
     readSource: async () => null,
+    officeConverter: async () => null,
+    officeConvert: async () => {
+      throw new Error('Office conversion needs the desktop app')
+    },
     printSpool: async () => {},
     printRun: async () => {
       window.print()
