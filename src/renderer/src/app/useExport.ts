@@ -8,6 +8,7 @@ import type { DocEntry, PageEntry } from '../types'
 import type { MarkMap } from '../edit/types'
 import type { FormValuesBySource } from '../forms/types'
 import type { ElementMap } from '../elements/types'
+import type { CommentMap } from '../comments/types'
 
 const PDFX_FILTER = { name: 'PDFX', extensions: ['pdfx'] }
 const PDF_FILTER = { name: 'PDF', extensions: ['pdf'] }
@@ -22,15 +23,18 @@ export function useExport(
   marks: MarkMap,
   formValues: FormValuesBySource,
   elements: ElementMap,
+  comments: CommentMap,
   setBusy: (busy: boolean) => void,
   flash: (message: string) => void
 ) {
   const preparePages = useCallback(
     (pages: PageEntry[], filled: Map<string, Uint8Array>) =>
       Promise.all(
-        pages.map((p) => prepareExportPage(p, marks[p.id], filled.get(p.source.id), elements[p.id]))
+        pages.map((p) =>
+          prepareExportPage(p, marks[p.id], filled.get(p.source.id), elements[p.id], comments[p.id])
+        )
       ),
-    [marks, elements]
+    [marks, elements, comments]
   )
 
   // A plain PDF of the given pages with everything drawn on them: marks,
@@ -50,8 +54,9 @@ export function useExport(
       !!page.rotation ||
       !!marks[page.id]?.length ||
       !!elements[page.id]?.length ||
+      !!comments[page.id]?.length ||
       Object.keys(formValues[page.source.id] ?? {}).length > 0,
-    [marks, elements, formValues]
+    [marks, elements, comments, formValues]
   )
 
   const run = useCallback(

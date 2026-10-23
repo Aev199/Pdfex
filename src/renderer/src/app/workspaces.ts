@@ -1,6 +1,7 @@
 import type { DocEntry } from '../types'
 import type { MarkMap } from '../edit/types'
 import type { ElementMap } from '../elements/types'
+import type { CommentMap } from '../comments/types'
 import type { FormValuesBySource } from '../forms/types'
 import type { UndoEntry } from './undo'
 import type { PageRef } from './types'
@@ -37,6 +38,7 @@ export interface WorkspaceSnapshot {
   docs: DocEntry[]
   marks: MarkMap
   elements: ElementMap
+  comments: CommentMap
   formValues: FormValuesBySource
   nextElementNumber: number
   undo: UndoSnapshot
@@ -57,6 +59,7 @@ export const emptySnapshot = (docs: DocEntry[] = []): WorkspaceSnapshot => ({
   docs,
   marks: {},
   elements: {},
+  comments: {},
   formValues: {},
   nextElementNumber: 1,
   undo: { stack: [], cursor: 0 },
@@ -96,20 +99,22 @@ export function uniqueTabName(base: string, taken: Iterable<string>): string {
 // values along, so they look the same on arrival. The source workspace keeps
 // its copies: its undo history may still bring the documents back.
 export function carryDocs(
-  from: Pick<WorkspaceSnapshot, 'marks' | 'elements' | 'formValues'>,
+  from: Pick<WorkspaceSnapshot, 'marks' | 'elements' | 'comments' | 'formValues'>,
   to: WorkspaceSnapshot,
   docs: DocEntry[]
 ): WorkspaceSnapshot {
   const marks = { ...to.marks }
   const elements = { ...to.elements }
+  const comments = { ...to.comments }
   const formValues = { ...to.formValues }
   for (const doc of docs) {
     for (const page of doc.pages) {
       if (from.marks[page.id]) marks[page.id] = from.marks[page.id]
       if (from.elements[page.id]) elements[page.id] = from.elements[page.id]
+      if (from.comments[page.id]) comments[page.id] = from.comments[page.id]
       const values = from.formValues[page.source.id]
       if (values) formValues[page.source.id] = values
     }
   }
-  return { ...to, docs: [...to.docs, ...docs], marks, elements, formValues }
+  return { ...to, docs: [...to.docs, ...docs], marks, elements, comments, formValues }
 }

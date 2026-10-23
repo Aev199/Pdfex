@@ -7,6 +7,7 @@ import { drawElements } from './elements'
 import { embedElementFonts, textRunsOf } from './elements/fonts'
 import type { ElementFonts } from './elements/fonts'
 import { registerAcroForm } from './form-fields'
+import { addCommentAnnotations } from './comments'
 import type { ExportDocument, ExportPage, PdfxManifest, RasterExportPage } from './format'
 
 interface BuildContext {
@@ -43,6 +44,7 @@ async function addExportPage(ctx: BuildContext, page: ExportPage): Promise<void>
   if (page.kind === 'raster') {
     const added = await addRasterPage(ctx.output, page)
     drawElements(added, page.elements, fonts)
+    addCommentAnnotations(ctx.output, added, page.comments)
     turn(added, page.rotation)
     return
   }
@@ -55,6 +57,7 @@ async function addExportPage(ctx: BuildContext, page: ExportPage): Promise<void>
   ctx.output.addPage(copied)
   drawElements(copied, page.elements, fonts)
   drawMarks(copied, page.marks)
+  addCommentAnnotations(ctx.output, copied, page.comments)
   turn(copied, page.rotation)
 }
 

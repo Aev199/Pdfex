@@ -7,7 +7,7 @@ import type { TextSpan } from '../../elements/text-marks'
 import { FullViewPage } from './FullViewPage'
 import { useFullViewDrag } from './use-full-view-drag'
 import { useCloseGuard } from './use-close-guard'
-import type { AnnotateHandlers } from './annotate'
+import type { AnnotateHandlers, CommentLayerState } from './annotate'
 
 const NO_VALUES: FormValues = {}
 
@@ -56,6 +56,7 @@ interface FullViewPagesProps {
     pageHeight: number
   ) => void
   annotate: AnnotateHandlers
+  commentLayer: CommentLayerState
   onSourcePage: (pageId: string, sourceIndex: number) => void
   setView: React.Dispatch<React.SetStateAction<View>>
   resetView: () => void
@@ -122,6 +123,7 @@ export function FullViewPages(props: FullViewPagesProps): React.JSX.Element {
               onMoveElement={(id, dx, dy) => onMoveElement(p.id, id, dx, dy)}
               onDraw={(points) => onDraw(p.id, points, p.width, p.height)}
               annotate={props.annotate}
+              commentLayer={props.commentLayer}
               onSourcePage={(index) => props.onSourcePage(p.id, index)}
               onAddText={(text, origin) => onAddText(p.id, text, origin, p.width, p.height)}
               onMarkText={(id, span) => onMarkText(p.id, id, span)}

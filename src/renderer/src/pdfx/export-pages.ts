@@ -3,6 +3,7 @@ import { rasterizeMarkedPage } from './rasterize'
 import { buildRedactedSourcePage } from './redact'
 import type { Mark } from '../edit/types'
 import type { PageElement } from '../elements/types'
+import type { CommentThread } from '../comments/types'
 import type { PageEntry } from '../types'
 import type { ExportPage } from './format'
 
@@ -10,10 +11,12 @@ export async function prepareExportPage(
   page: PageEntry,
   marks: Mark[] | undefined,
   filledBytes?: Uint8Array,
-  elements?: PageElement[]
+  elements?: PageElement[],
+  comments?: CommentThread[]
 ): Promise<ExportPage> {
   const prepared = await preparePage(page, marks, filledBytes)
   prepared.elements = elements
+  prepared.comments = comments
   prepared.rotation = page.rotation
   return prepared
 }

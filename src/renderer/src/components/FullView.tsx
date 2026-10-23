@@ -16,7 +16,11 @@ import { createMeasureElement } from '../elements/measures'
 import { createCalloutElement, restyledCallout } from '../elements/callouts'
 import { CalibrateDialog } from './full-view/CalibrateDialog'
 import { AnnotateBar } from './full-view/AnnotateBar'
-import type { AnnotateHandlers } from './full-view/annotate'
+import type { AnnotateHandlers, CommentLayerState } from './full-view/annotate'
+import { CommentsPanel } from './comments/CommentsPanel'
+import type { CommentState } from '../app/useComments'
+import type { CommentPoint } from '../comments/types'
+import { orderedThreads } from '../comments/threads'
 import type { TextSpan } from '../elements/text-marks'
 import type { Rect } from './full-view/geometry'
 import { useElementSelection } from './full-view/use-element-selection'
@@ -79,17 +83,26 @@ interface FullViewProps {
     pageWidth: number,
     pageHeight: number
   ) => void
+  comments: CommentState
   onActivePageChange: (pageId: string) => void
   onPrint: (pages: PageEntry[], title: string) => void
   onClose: () => void
 }
 
 const SIDEBAR_KEY = 'pdfx.readerSidebar'
-const readSidebarPref = (): boolean => {
+const COMMENTS_KEY = 'pdfx.readerComments'
+const readPref = (key: string): boolean => {
   try {
-    return localStorage.getItem(SIDEBAR_KEY) === '1'
+    return localStorage.getItem(key) === '1'
   } catch {
     return false
+  }
+}
+const writePref = (key: string, on: boolean): void => {
+  try {
+    localStorage.setItem(key, on ? '1' : '0')
+  } catch {
+    // Not remembered, still toggled.
   }
 }
 
@@ -113,6 +126,7 @@ export function FullView({
   onMoveElement,
   onToggleTextMark,
   onUpdateText,
+  comments,
   onActivePageChange,
   onPrint,
   onClose
@@ -267,20 +281,94 @@ export function FullView({
       : textStyle
 
   // Reader sidebar (pages / outline), remembered between openings.
-  const [sidebarOpen, setSidebarOpen] = useState(readSidebarPref)
+  const [sidebarOpen, setSidebarOpen] = useState(() => readPref(SIDEBAR_KEY))
   const toggleSidebar = useCallback(() => {
     setSidebarOpen((open) => {
-      try {
-        localStorage.setItem(SIDEBAR_KEY, open ? '0' : '1')
-      } catch {
-        // Not remembered, still toggled.
-      }
+      writePref(SIDEBAR_KEY, !open)
       return !open
     })
   }, [])
   const { goTo } = controls
   const { di, doc, pi, page } = s
   const goToPage = useCallback((index: number) => goTo(di, index), [goTo, di])
+
+  // Review comments: the panel on the right and the pins on the pages.
+  const [commentsOpen, setCommentsOpenState] = useState(() => readPref(COMMENTS_KEY))
+  const setCommentsOpen = useCallback((open: boolean) => {
+    writePref(COMMENTS_KEY, open)
+    setCommentsOpenState(open)
+  }, [])
+  const [placing, setPlacing] = useState(false)
+  const [draft, setDraft] = useState<{ pageId: string; anchor: CommentPoint } | null>(null)
+  const [activeComment, setActiveComment] = useState<string | null>(null)
+  const [showResolved, setShowResolved] = useState(false)
+  const [pinsShown, setPinsShown] = useState(true)
+  const commentMap = comments.comments
+  // Pins are numbered through the document, page by page in reading order.
+  const commentNumbers = useMemo(() => {
+    const numbers = new Map<string, number>()
+    for (const d of docs) {
+      let n = 0
+      for (const p of d.pages) {
+        for (const t of orderedThreads(commentMap[p.id] ?? [])) numbers.set(t.id, ++n)
+      }
+    }
+    return numbers
+  }, [docs, commentMap])
+  const openComments = doc.pages.reduce(
+    (sum, p) => sum + (commentMap[p.id]?.filter((t) => !t.resolved).length ?? 0),
+    0
+  )
+  const commentLayer = useMemo<CommentLayerState>(
+    () => ({
+      comments: commentMap,
+      numbers: commentNumbers,
+      activeId: activeComment,
+      showResolved,
+      pinsShown: pinsShown || placing || draft !== null,
+      placing,
+      draft,
+      onOpen: (threadId) => {
+        setCommentsOpen(true)
+        setActiveComment(threadId)
+      },
+      onPlace: (pageId, anchor) => {
+        setPlacing(false)
+        setDraft({ pageId, anchor })
+        setActiveComment(null)
+        setCommentsOpen(true)
+      }
+    }),
+    [
+      commentMap,
+      commentNumbers,
+      activeComment,
+      showResolved,
+      pinsShown,
+      placing,
+      draft,
+      setCommentsOpen
+    ]
+  )
+  const toggleComments = useCallback(() => {
+    if (commentsOpen) {
+      setPlacing(false)
+      setDraft(null)
+    }
+    setCommentsOpen(!commentsOpen)
+  }, [commentsOpen, setCommentsOpen])
+  // Esc first gives up placing or writing a new comment, then closes as usual.
+  useEffect(() => {
+    if (!placing) return
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      setPlacing(false)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [placing])
 
   // An internal link: the page of the same file, if this document has it.
   const followLink = useCallback(
@@ -316,6 +404,9 @@ export function FullView({
       if (event.key === 'F4') {
         event.preventDefault()
         toggleSidebar()
+      } else if (event.key === 'F6') {
+        event.preventDefault()
+        toggleComments()
       } else if (event.key === 'Home' && !edit.editing) {
         event.preventDefault()
         goToPage(0)
@@ -326,7 +417,7 @@ export function FullView({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [toggleSidebar, goToPage, doc.pages.length, edit.editing])
+  }, [toggleSidebar, toggleComments, goToPage, doc.pages.length, edit.editing])
 
   useEffect(
     () =>
@@ -389,6 +480,7 @@ export function FullView({
         onMoveElement={onMoveElement}
         onDraw={onAddInk}
         annotate={annotate}
+        commentLayer={commentLayer}
         onSourcePage={followLink}
         onAddText={onAddText}
         onMarkText={(pageId, elementId, span) => {
@@ -435,8 +527,50 @@ export function FullView({
         onToggleSidebar={toggleSidebar}
         onPrint={print}
         editBlocked={editBlocked}
+        commentsOpen={commentsOpen}
+        commentCount={openComments}
+        onToggleComments={toggleComments}
       />
       {sidebarOpen && !animating && <FullViewSidebar doc={doc} current={pi} onGo={goToPage} />}
+      {commentsOpen && !animating && (
+        <CommentsPanel
+          doc={doc}
+          comments={commentMap}
+          numbers={commentNumbers}
+          activeId={activeComment}
+          draftPage={draft ? doc.pages.findIndex((p) => p.id === draft.pageId) : null}
+          placing={placing}
+          showResolved={showResolved}
+          pinsShown={pinsShown}
+          onNew={() => {
+            setDraft(null)
+            setPlacing(!placing)
+          }}
+          onPost={(text) => {
+            if (!draft) return
+            setActiveComment(comments.addThread(draft.pageId, draft.anchor, text))
+            setDraft(null)
+          }}
+          onCancelDraft={() => setDraft(null)}
+          onSelect={(index, threadId) => {
+            setActiveComment(threadId)
+            if (index !== pi) goToPage(index)
+          }}
+          onReply={comments.reply}
+          onEdit={comments.editText}
+          onRemove={(pageId, threadId, replyId) => {
+            comments.remove(pageId, threadId, replyId)
+            if (replyId === null && threadId === activeComment) setActiveComment(null)
+          }}
+          onResolve={(pageId, threadId, resolved) => {
+            comments.resolve(pageId, threadId, resolved)
+            if (resolved && !showResolved) setActiveComment(null)
+          }}
+          onShowResolved={setShowResolved}
+          onPinsShown={setPinsShown}
+          onClose={toggleComments}
+        />
+      )}
       {edit.editing && isMarkTool(edit.tool) && <ToolCursor tool={edit.tool} />}
       {calibration !== null && (
         <CalibrateDialog

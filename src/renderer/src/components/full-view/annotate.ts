@@ -6,6 +6,7 @@ import type {
   ShapeKind,
   TextStyle
 } from '../../elements/types'
+import type { CommentMap, CommentPoint } from '../../comments/types'
 
 // What the annotation tools (pen, shapes, eraser) need from the full view.
 export interface AnnotateHandlers {
@@ -39,4 +40,17 @@ export interface AnnotateHandlers {
     pageWidth: number,
     pageHeight: number
   ) => void
+}
+
+// Review comments over the reader's pages (see CommentPins).
+export interface CommentLayerState {
+  comments: CommentMap
+  numbers: Map<string, number>
+  activeId: string | null
+  showResolved: boolean
+  pinsShown: boolean
+  placing: boolean
+  draft: { pageId: string; anchor: CommentPoint } | null
+  onOpen: (threadId: string) => void
+  onPlace: (pageId: string, anchor: CommentPoint) => void
 }

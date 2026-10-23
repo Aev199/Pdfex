@@ -6,6 +6,7 @@ import type { PageRef } from '../../app/types'
 import type { MarkMap } from '../../edit/types'
 import type { FormValuesBySource } from '../../forms/types'
 import type { ElementMap } from '../../elements/types'
+import type { CommentMap } from '../../comments/types'
 import type { SelectModifiers } from '../../app/useCollection'
 
 const NO_PAGES: ReadonlySet<string> = new Set()
@@ -23,6 +24,7 @@ interface DocLayerProps {
   marks: MarkMap
   formValues: FormValuesBySource
   elements: ElementMap
+  comments: CommentMap
   intoDocId: string | null
   intoIndex: number
   intoGhostWidth: number
@@ -84,6 +86,7 @@ function DocLayerImpl(props: DocLayerProps): React.JSX.Element {
               marks={props.marks}
               formValues={props.formValues}
               elements={props.elements}
+              comments={props.comments}
               intoGhost={
                 intoDocId === doc.id
                   ? { index: intoIndex, width: intoGhostWidth, height: intoGhostHeight }

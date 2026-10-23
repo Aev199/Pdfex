@@ -406,6 +406,86 @@ test('measurements and callouts are labelled and exported as real text', async (
   assert.match(text, /Узел 1/)
 })
 
+test('comments: reply, resolve, survive a restart and export as PDF notes', async () => {
+  const data = freshData()
+  const out = join(work, 'commented.pdf')
+  let run = await launch(data, [files.second])
+  try {
+    const { page } = run
+    await rendered(page)
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    if (!(await page.locator('.comments-panel').count())) await page.keyboard.press('F6')
+    const fp = await page.locator('.full-page').first().boundingBox()
+    const at = (fx, fy) => [fp.x + fp.width * fx, fp.y + fp.height * fy]
+
+    await page.locator('.comments-new').click()
+    await page.mouse.click(...at(0.3, 0.3))
+    await page.keyboard.type('Check the dimension')
+    await page.keyboard.press('Enter')
+    await page.locator('.comment-reply-btn').first().click()
+    await page.keyboard.type('Fixed in rev. B')
+    await page.keyboard.press('Enter')
+
+    await page.locator('.comments-new').click()
+    await page.mouse.click(...at(0.6, 0.7))
+    await page.keyboard.type('Second note')
+    await page.keyboard.press('Enter')
+    assert.deepEqual(await texts(page, '.comment-pin'), ['1', '2'])
+    await page
+      .locator('.comment-card', { hasText: 'Second note' })
+      .locator('.comment-resolve')
+      .click()
+    // Resolved threads leave the page and the list until asked for.
+    assert.deepEqual(await texts(page, '.comment-pin'), ['1'])
+    assert.equal(await page.locator('.comment-card').count(), 1)
+    await page.locator('.comments-filter input').check()
+    assert.equal(await page.locator('.comment-card.resolved').count(), 1)
+    await page.locator('.comments-panel .comments-icon-btn[title^="Hide"]').click()
+    assert.equal(await page.locator('.comment-pin').count(), 0)
+
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    assert.equal(await page.locator('.page-comments').first().textContent(), '1')
+    await page.waitForTimeout(2000)
+  } finally {
+    await run.app.close()
+  }
+
+  run = await launch(data)
+  try {
+    const { app, page } = run
+    await rendered(page)
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    if (!(await page.locator('.comments-panel').count())) await page.keyboard.press('F6')
+    await page.locator('.comments-filter input').check()
+    assert.equal(await page.locator('.comment-card').count(), 2)
+    assert.match(await page.locator('.comment-card').first().textContent(), /Fixed in rev\. B/)
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await mockSaveDialog(app, out)
+    await menu(app, 'export-pdf')
+    for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
+  } finally {
+    await run.app.close()
+  }
+
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(out)) }).promise
+  const notes = (await (await doc.getPage(1)).getAnnotations()).filter((a) => a.subtype === 'Text')
+  const byText = (text) => notes.find((n) => n.contentsObj?.str === text)
+  const first = byText('Check the dimension')
+  assert.ok(first && !first.inReplyTo)
+  assert.equal(byText('Fixed in rev. B')?.inReplyTo, first.id)
+  const second = byText('Second note')
+  assert.ok(second)
+  assert.ok(notes.some((n) => n.inReplyTo === second.id && /Completed/.test(n.contentsObj?.str)))
+  // Nothing was drawn: the page text is the source's own.
+  const content = await (await doc.getPage(1)).getTextContent()
+  assert.doesNotMatch(content.items.map((i) => i.str).join(' '), /Check the dimension/)
+})
+
 test('reader: thumbnails, page jump, rotation and printing', async () => {
   const { app, page } = await launch(freshData(), [files.report])
   try {

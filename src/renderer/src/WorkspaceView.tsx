@@ -9,6 +9,7 @@ import { useCollection } from './app/useCollection'
 import { createZoomStore } from './app/zoom-store'
 import { useFullView } from './app/useFullView'
 import { useMarks } from './app/useMarks'
+import { useComments } from './app/useComments'
 import { useFormValues } from './app/useFormValues'
 import { useElements } from './app/useElements'
 import { ACTIONS, useUndoStack } from './app/undo'
@@ -105,6 +106,7 @@ export function WorkspaceView({
   const markState = useMarks(undoStack.push, initial.marks)
   const formState = useFormValues(initial.formValues)
   const elementState = useElements(undoStack.push, initial.elements, initial.nextElementNumber)
+  const commentState = useComments(initial.comments)
   const collection = useCollection(flash, undoStack.push, initial, onDetachedUpdate)
   const [missing, setMissing] = useState<MissingDoc[]>(initial.missing)
   const missingRef = useRef(missing)
@@ -117,6 +119,7 @@ export function WorkspaceView({
         docs: collection.docsRef.current,
         marks: markState.marksRef.current,
         elements: elementState.elementsRef.current,
+        comments: commentState.commentsRef.current,
         formValues: formState.valuesRef.current,
         nextElementNumber: elementState.nextNumberRef.current,
         undo: undoStack.snapshot(),
@@ -132,7 +135,7 @@ export function WorkspaceView({
       updateDocs: (update) => collection.setDocs(update),
       flash
     }),
-    [collection, markState, elementState, formState, undoStack, initial.view, flash]
+    [collection, markState, elementState, commentState, formState, undoStack, initial.view, flash]
   )
   const fullViewState = useFullView()
   const docs = collection.docs
@@ -184,7 +187,14 @@ export function WorkspaceView({
   onChangeRef.current = onChange
   useEffect(() => {
     onChangeRef.current()
-  }, [docs, markState.marks, elementState.elements, formState.values, missing])
+  }, [
+    docs,
+    markState.marks,
+    elementState.elements,
+    commentState.comments,
+    formState.values,
+    missing
+  ])
 
   const sourceWatch = useSourceWatch(docs, collection.swapSource, flash)
 
@@ -271,6 +281,7 @@ export function WorkspaceView({
     markState.marks,
     formState.values,
     elementState.elements,
+    commentState.comments,
     setBusy,
     flash
   )
@@ -667,6 +678,7 @@ export function WorkspaceView({
             marks={markState.marks}
             formValues={formState.values}
             elements={elementState.elements}
+            comments={commentState.comments}
             dragKind={drag.dragKind}
             draggingPage={drag.draggingPage}
             dropTarget={drag.dropTarget}
@@ -714,6 +726,7 @@ export function WorkspaceView({
               onMoveElement={elementState.moveElement}
               onToggleTextMark={elementState.toggleTextMark}
               onUpdateText={elementState.updateText}
+              comments={commentState}
               onActivePageChange={fullViewState.setHiddenPageId}
               onPrint={(pages, title) => void printPages(pages, title)}
               onClose={fullViewState.closeFullView}

@@ -35,6 +35,8 @@ export interface SessionWorkspace {
   missing: MissingDoc[]
   marks: WorkspaceSnapshot['marks']
   elements: WorkspaceSnapshot['elements']
+  // Added after the first release: older sessions have none.
+  comments?: WorkspaceSnapshot['comments']
   formValues: WorkspaceSnapshot['formValues']
   nextElementNumber: number
 }
@@ -115,6 +117,7 @@ export function serializeSession(
       missing: snapshot.missing,
       marks: pick(snapshot.marks, pageIds),
       elements: pick(snapshot.elements, pageIds),
+      comments: pick(snapshot.comments, pageIds),
       formValues: pick(snapshot.formValues, sourceIds),
       nextElementNumber: snapshot.nextElementNumber
     }
@@ -217,6 +220,7 @@ export async function restoreSession(loaded: LoadedSession): Promise<Restored> {
         ...emptySnapshot(docs),
         marks: ws.marks ?? {},
         elements: ws.elements ?? {},
+        comments: ws.comments ?? {},
         formValues: ws.formValues ?? {},
         nextElementNumber: ws.nextElementNumber ?? 1,
         view: ws.view ?? null,

@@ -17,6 +17,8 @@ export interface Settings {
   office: OfficePreference
   // Reopen the tabs of the last run on start.
   restoreSession: boolean
+  // Name signed under review comments.
+  commentAuthor: string
 }
 
 export interface AppInfo {
