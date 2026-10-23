@@ -85,3 +85,5 @@ Check (Test-Path (Join-Path $app 'pdfx.exe')) 'pdfx.exe is still there'
 Start-Sleep -Seconds 2
 Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
 Write-Host 'update swap: all checks passed'
+# taskkill's exit code would otherwise become the step's result.
+exit 0
