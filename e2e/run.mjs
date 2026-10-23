@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PDFDocument, PDFName } from 'pdf-lib'
+import { PDFDocument, PDFName, rgb } from 'pdf-lib'
 import { inflateSync } from 'node:zlib'
 import { createHash } from 'node:crypto'
 import { strToU8, zipSync } from 'fflate'
@@ -534,6 +534,80 @@ test('an exported scan gets its recognized text as an invisible layer', async ()
   const word = content.items.find((item) => item.str.includes('Скважина'))
   assert.ok(Math.abs(word.transform[4] - 54) < 12, `x ${word.transform[4]}`)
   assert.ok(Math.abs(word.transform[5] - (842 - 143)) < 20, `y ${word.transform[5]}`)
+})
+
+test('two revisions of a sheet are compared: removed red, added blue', async () => {
+  const revA = join(work, 'КЖ лист 2 изм.0.pdf')
+  const revB = join(work, 'КЖ лист 2 изм.1.pdf')
+  for (const [file, x] of [
+    [revA, 200],
+    [revB, 400]
+  ]) {
+    const doc = await PDFDocument.create()
+    const sheet = doc.addPage([842, 595])
+    sheet.drawRectangle({
+      x: 30,
+      y: 30,
+      width: 782,
+      height: 535,
+      borderWidth: 2,
+      borderColor: rgb(0, 0, 0)
+    })
+    // The beam moved between the revisions.
+    sheet.drawRectangle({ x, y: 250, width: 120, height: 40, color: rgb(0, 0, 0) })
+    writeFileSync(file, await doc.save())
+  }
+  const { page, app } = await launch(freshData(), [revA, revB])
+  try {
+    await rendered(page)
+    const pages = page.locator('.canvas-world .page[data-page-id]')
+    await pages.nth(0).click()
+    await pages.nth(1).click({ modifiers: ['Control'] })
+    await pages.nth(1).click({ button: 'right' })
+    await clickMenuItem(page, 'Compare the 2 pages')
+    await page.waitForFunction(
+      () => document.querySelector('.compare-stats')?.textContent === 'Changes found',
+      null,
+      { timeout: 20000 }
+    )
+    assert.match(await page.locator('.compare-name.older').textContent(), /изм\.0/)
+    // Sample the overlay: the old beam's place is red, the new one's blue,
+    // the frame both share is grey.
+    const colours = await page.evaluate(() => {
+      const canvas = document.querySelector('.compare-canvas')
+      const ctx = canvas.getContext('2d')
+      const at = (x, y) =>
+        [
+          ...ctx.getImageData(Math.round(canvas.width * x), Math.round(canvas.height * y), 1, 1)
+            .data
+        ].slice(0, 3)
+      return {
+        removed: at(260 / 842, 1 - 270 / 595),
+        added: at(460 / 842, 1 - 270 / 595),
+        frame: at(0.5, 1 - 30 / 595)
+      }
+    })
+    const [r1, g1, b1] = colours.removed
+    assert.ok(r1 > 200 && g1 < 80 && b1 < 80, `removed ${colours.removed}`)
+    const [r2, , b2] = colours.added
+    assert.ok(b2 > 200 && r2 < 80, `added ${colours.added}`)
+    const [r3, g3, b3] = colours.frame
+    assert.ok(r3 === g3 && g3 === b3 && r3 < 200, `frame ${colours.frame}`)
+
+    // Arrows shift the new sheet; Reset puts it back.
+    await page.keyboard.press('Shift+ArrowRight')
+    assert.match(await page.locator('.compare-nudge').textContent(), /offset 10, 0 px/)
+    await page.locator('.compare-nudge button', { hasText: 'Reset' }).click()
+    await page.locator('.compare-view button[title="Swap old and new"]').click()
+    await page.waitForFunction(() =>
+      /изм\.1/.test(document.querySelector('.compare-name.older')?.textContent ?? '')
+    )
+    await page.keyboard.press('Escape')
+    assert.equal(await page.locator('.compare-view').count(), 0)
+    assert.equal(await page.locator('.canvas-world .page[data-page-id]').count(), 2)
+  } finally {
+    await app.close()
+  }
 })
 
 test('reader: thumbnails, page jump, rotation and printing', async () => {
