@@ -39,6 +39,9 @@ export interface FullViewControls {
   runClose: () => void
 }
 
+// One page turn, from the wheel, the arrow keys or the side buttons.
+const PAGE_TURN_MS = 150
+
 export function useFullViewControls(opts: ControlsOptions): FullViewControls {
   const { scrollRef, closingRef, editingRef, docsRef, vpRef, curRef, phaseRef } = opts
   const { setView, setPhase, setFlip, setFlipTransition, setRevealed, onClose } = opts
@@ -90,18 +93,41 @@ export function useFullViewControls(opts: ControlsOptions): FullViewControls {
   // Quick repeats (wheel notches, a held key) count from the page already
   // on its way, not from the one still on screen, so each moves one more.
   const turning = useRef<{ di: number; pi: number; at: number } | null>(null)
+  const glide = useRef<number | null>(null)
+  // A quick ease-out of our own: the browser's smooth scroll is slow and
+  // can't be tuned. Snapping is off while it runs (every frame's scrollTop
+  // would snap back) and on again at the end, which is a snap point.
+  const glideTo = useCallback((sc: HTMLElement, top: number) => {
+    if (glide.current !== null) cancelAnimationFrame(glide.current)
+    const from = sc.scrollTop
+    const started = performance.now()
+    sc.style.scrollSnapType = 'none'
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - started) / PAGE_TURN_MS)
+      sc.scrollTop = from + (top - from) * (1 - Math.pow(1 - t, 3))
+      if (t < 1) {
+        glide.current = requestAnimationFrame(step)
+      } else {
+        glide.current = null
+        sc.style.scrollSnapType = ''
+      }
+    }
+    glide.current = requestAnimationFrame(step)
+  }, [])
   const navByKey = useCallback((_axis: 'x' | 'y', dir: 1 | -1) => {
     const sc = scrollRef.current
     if (!sc) return
     const now = performance.now()
     const base =
-      turning.current && now - turning.current.at < 450 ? turning.current : curRef.current
+      turning.current && now - turning.current.at < PAGE_TURN_MS + 150
+        ? turning.current
+        : curRef.current
     const counts = docsRef.current.map((d) => d.pages.length)
     const next = stepPage(counts, base.di, base.pi, dir)
     const top = slideTop(sc, next.di, next.pi)
     if (top === null) return
     turning.current = { ...next, at: now }
-    sc.scrollTo({ top, behavior: 'smooth' })
+    glideTo(sc, top)
   }, [])
 
   const runClose = useCallback(() => {
@@ -138,7 +164,8 @@ export function useFullViewControls(opts: ControlsOptions): FullViewControls {
     if (top === null) return
     setView({ zoom: 1, x: 0, y: 0 })
     const far = Math.abs(tpi - curRef.current.pi) > 3 || tdi !== curRef.current.di
-    sc.scrollTo({ top, behavior: far ? 'auto' : 'smooth' })
+    if (far) sc.scrollTo({ top })
+    else glideTo(sc, top)
   }, [])
 
   return { resetView, applyZoom, panBy, navByKey, goTo, runClose }
