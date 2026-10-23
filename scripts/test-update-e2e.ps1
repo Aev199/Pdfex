@@ -47,6 +47,8 @@ for ($i = 0; $i -lt 120 -and -not $done; $i++) {
 Start-Sleep -Seconds 5
 Write-Host '--- update.log'
 Get-Content (Join-Path $updates 'update.log') -ErrorAction SilentlyContinue | Write-Host
+Write-Host '--- powershell.log'
+Get-Content (Join-Path $updates 'powershell.log') -ErrorAction SilentlyContinue | Write-Host
 Write-Host '---'
 Check ((Version $app) -eq '9.9.9') 'the new version is in the program folder'
 Check (Test-Path (Join-Path $app 'NEW.txt')) 'its files arrived'

@@ -20,7 +20,7 @@ import applyScript from './apply.ps1?raw'
 import type { AppInfo, UpdateOffer, UpdateState } from '../../preload/app-types'
 
 // Not Electron's fs: it would treat the update's app.asar as a folder.
-const { appendFileSync, existsSync, readFileSync, writeFileSync } = originalFs
+const { appendFileSync, existsSync, openSync, readFileSync, writeFileSync } = originalFs
 const { rename, rm, writeFile, readFile, unlink, mkdir } = originalFs.promises
 
 // Updates as in Papka: GitHub releases with latest.json (version, SHA-256,
@@ -469,6 +469,7 @@ export function applyOnQuit(): void {
       Relaunch: relaunch ? '1' : '',
       WaitPid: String(process.pid)
     }
+    const output = openSync(join(dir, 'powershell.log'), 'w')
     const child = spawn(
       'powershell.exe',
       [
@@ -486,7 +487,9 @@ export function applyOnQuit(): void {
           .filter(([, value]) => value !== '')
           .flatMap(([key, value]) => [`-${key}`, value])
       ],
-      { detached: true, stdio: 'ignore', windowsHide: true, cwd: dir }
+      // PowerShell's own output and errors go to a file: whatever stops it
+      // before the script logs anything shows up there.
+      { detached: true, stdio: ['ignore', output, output], windowsHide: true, cwd: dir }
     )
     child.unref()
     log(
