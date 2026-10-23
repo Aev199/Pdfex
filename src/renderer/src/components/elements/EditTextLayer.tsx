@@ -1,10 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { lookOf } from '../../elements/types'
-import type { TextElement } from '../../elements/types'
+import type { CalloutElement, TextElement } from '../../elements/types'
 import { TextEditor } from './TextEditor'
 
 interface EditTextLayerProps {
-  element: TextElement
+  element: TextElement | CalloutElement
   naturalHeight: number
   onCommit: (text: string) => void
 }

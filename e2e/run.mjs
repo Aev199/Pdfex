@@ -344,6 +344,68 @@ test('styled text and an underline are exported with their fonts and colours', a
   assert.match(pageContent(doc, 0), /0\.49\d* 0\.86\d* 0\.52\d* rg/)
 })
 
+test('measurements and callouts are labelled and exported as real text', async () => {
+  const { app, page } = await launch(freshData(), [files.second])
+  const out = join(work, 'measured.pdf')
+  try {
+    await rendered(page)
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    await page.locator('.full-actions .btn', { hasText: 'Edit' }).click()
+    const fp = await page.locator('.full-page').first().boundingBox()
+    const at = (fx, fy) => [fp.x + fp.width * fx, fp.y + fp.height * fy]
+
+    await page.locator('.annotate-tool[title="Measure length"]').click()
+    await page.locator('.annotate-select[title="Drawing scale"]').selectOption('1:100')
+    await page.locator('.annotate-select[title="Units"]').selectOption('m')
+    await page.mouse.move(...at(0.2, 0.6))
+    await page.mouse.down()
+    await page.mouse.move(...at(0.6, 0.6), { steps: 6 })
+    await page.mouse.up()
+    // 40% of an A4 width (238 pt = 84 mm) at 1:100 is 8.4 m.
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('.measure-label text')].some((t) =>
+        /^8,4\d? м$/.test(t.textContent ?? '')
+      )
+    )
+
+    await page.locator('.annotate-tool[title^="Measure an area"]').click()
+    await page.mouse.click(...at(0.2, 0.7))
+    await page.mouse.click(...at(0.5, 0.7))
+    await page.mouse.dblclick(...at(0.5, 0.8))
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('.measure-label text')].some((t) =>
+        (t.textContent ?? '').endsWith('м²')
+      )
+    )
+
+    await page.locator('.annotate-tool[title^="Callout"]').click()
+    await page.mouse.move(...at(0.4, 0.88))
+    await page.mouse.down()
+    await page.mouse.move(...at(0.6, 0.82), { steps: 6 })
+    await page.mouse.up()
+    await page.keyboard.type('Узел 1')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+
+    await page.locator('.full-actions .btn', { hasText: 'Done' }).click()
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await mockSaveDialog(app, out)
+    await menu(app, 'export-pdf')
+    for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
+  } finally {
+    await app.close()
+  }
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(out)) }).promise
+  const content = await (await doc.getPage(1)).getTextContent()
+  const text = content.items.map((item) => item.str).join(' ')
+  assert.match(text, /8,4\d? м/)
+  assert.match(text, /м²/)
+  assert.match(text, /Узел 1/)
+})
+
 test('reader: thumbnails, page jump, rotation and printing', async () => {
   const { app, page } = await launch(freshData(), [files.report])
   try {

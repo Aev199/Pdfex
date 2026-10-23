@@ -2,7 +2,8 @@ import { useCallback, useRef, useState } from 'react'
 import { MARK_COLORS } from '../../../edit/types'
 import type { EditTool, MarkLook, MarkMap } from '../../../edit/types'
 import { DEFAULT_TEXT_STYLE, DRAW_COLORS, DRAW_WIDTHS, TEXT_SIZES } from '../../../elements/types'
-import type { DrawStyle, TextStyle } from '../../../elements/types'
+import type { DrawStyle, MeasureScale, TextStyle } from '../../../elements/types'
+import { ratioScale } from '../../../elements/measures'
 
 export interface EditMode {
   editing: boolean
@@ -19,11 +20,14 @@ export interface EditMode {
   setTextStyle: (style: TextStyle) => void
   markLook: MarkLook
   setMarkLook: (look: MarkLook) => void
+  measureScale: MeasureScale
+  setMeasureScale: (scale: MeasureScale) => void
 }
 
 const STYLE_KEY = 'pdfx.drawStyle'
 const TEXT_STYLE_KEY = 'pdfx.textStyle'
 const MARK_LOOK_KEY = 'pdfx.markLook'
+const MEASURE_SCALE_KEY = 'pdfx.measureScale'
 
 function loadSaved<T>(key: string, valid: (value: T) => boolean, fallback: T): T {
   try {
@@ -52,6 +56,17 @@ const loadTextStyle = (): TextStyle =>
       TEXT_SIZES.includes(s.fontSize) &&
       DRAW_COLORS.includes(s.color),
     DEFAULT_TEXT_STYLE
+  )
+
+const loadMeasureScale = (): MeasureScale =>
+  loadSaved<MeasureScale>(
+    MEASURE_SCALE_KEY,
+    (s) =>
+      typeof s.perPoint === 'number' &&
+      s.perPoint > 0 &&
+      ['mm', 'cm', 'm'].includes(s.unit) &&
+      typeof s.label === 'string',
+    ratioScale(100, 'm')
   )
 
 const loadMarkLook = (): MarkLook =>
@@ -97,6 +112,11 @@ export function useEditMode(marks: MarkMap, restore: (map: MarkMap) => void): Ed
     setMarkLookState(look)
     save(MARK_LOOK_KEY, look)
   }, [])
+  const [measureScale, setMeasureScaleState] = useState<MeasureScale>(loadMeasureScale)
+  const setMeasureScale = useCallback((scale: MeasureScale) => {
+    setMeasureScaleState(scale)
+    save(MEASURE_SCALE_KEY, scale)
+  }, [])
   const editingRef = useRef(editing)
   editingRef.current = editing
   const marksRef = useRef(marks)
@@ -135,6 +155,8 @@ export function useEditMode(marks: MarkMap, restore: (map: MarkMap) => void): Ed
     textStyle,
     setTextStyle,
     markLook,
-    setMarkLook
+    setMarkLook,
+    measureScale,
+    setMeasureScale
   }
 }

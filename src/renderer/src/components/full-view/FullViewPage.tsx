@@ -20,7 +20,10 @@ import { PageRotor, naturalSize } from '../PageRotor'
 import { CopyTextLayer, LinkLayer } from './ReaderLayers'
 import { ShapeLayer } from '../elements/ShapeLayer'
 import { EraseLayer } from '../elements/EraseLayer'
-import { isShapeTool } from '../../edit/types'
+import { isMeasureTool, isShapeTool } from '../../edit/types'
+import { MeasureLayer } from '../elements/MeasureLayer'
+import { CalloutLayer } from '../elements/CalloutLayer'
+import { polylinePoints } from '../../elements/measures'
 import type { AnnotateHandlers } from './annotate'
 
 interface FullViewPageProps {
@@ -196,6 +199,33 @@ export function FullViewPage(props: FullViewPageProps): React.JSX.Element {
               naturalHeight={n.height}
               onCommit={(from, to) =>
                 props.annotate.onShape(p.id, selectTool, from, to, p.width, p.height)
+              }
+            />
+          )}
+          {isCurrent && (isMeasureTool(selectTool) || selectTool === 'calibrate') && (
+            <MeasureLayer
+              key={selectTool}
+              mode={selectTool === 'calibrate' ? 'calibrate' : selectTool}
+              style={props.annotate.style}
+              scale={props.annotate.measureScale}
+              naturalWidth={n.width}
+              naturalHeight={n.height}
+              pageWidth={p.width}
+              pageHeight={p.height}
+              onCommit={(points) =>
+                selectTool === 'calibrate'
+                  ? props.annotate.onCalibrate(polylinePoints(points, p.width, p.height))
+                  : props.annotate.onMeasure(p.id, selectTool, points, p.width, p.height)
+              }
+            />
+          )}
+          {isCurrent && selectTool === 'callout' && (
+            <CalloutLayer
+              style={props.annotate.textStyle}
+              naturalWidth={n.width}
+              naturalHeight={n.height}
+              onCommit={(anchor, origin, text) =>
+                props.annotate.onCallout(p.id, anchor, origin, text, p.width, p.height)
               }
             />
           )}

@@ -12,6 +12,9 @@ import type {
   TextStyle
 } from '../elements/types'
 import { createTextElement, restyledTextElement } from '../elements/create'
+import { createMeasureElement } from '../elements/measures'
+import { createCalloutElement, restyledCallout } from '../elements/callouts'
+import { CalibrateDialog } from './full-view/CalibrateDialog'
 import { AnnotateBar } from './full-view/AnnotateBar'
 import type { AnnotateHandlers } from './full-view/annotate'
 import type { TextSpan } from '../elements/text-marks'
@@ -189,17 +192,28 @@ export function FullView({
     ...controls
   })
 
-  const { drawStyle, textStyle } = edit
+  const { drawStyle, textStyle, measureScale } = edit
+  const [calibration, setCalibration] = useState<number | null>(null)
   const annotate = useMemo<AnnotateHandlers>(
     () => ({
       style: drawStyle,
       textStyle,
+      measureScale,
+      onMeasure: (pageId, mode, points, w, h) =>
+        onAddElement(pageId, (n) =>
+          createMeasureElement(mode, points, n, w, h, drawStyle, measureScale)
+        ),
+      onCalibrate: (length) => {
+        if (length > 3) setCalibration(length)
+      },
+      onCallout: (pageId, anchor, origin, text, w, h) =>
+        onAddElement(pageId, (n) => createCalloutElement(anchor, origin, text, n, w, h, textStyle)),
       onPen: (pageId, points, w, h) => onAddInk(pageId, points, w, h, drawStyle),
       onShape: (pageId, shape, from, to, w, h) =>
         onAddShape(pageId, shape, from, to, w, h, drawStyle),
       onErase: onRemoveElements
     }),
-    [drawStyle, textStyle, onAddInk, onAddShape, onRemoveElements]
+    [drawStyle, textStyle, measureScale, onAddInk, onAddShape, onRemoveElements, onAddElement]
   )
 
   const onAddText = useCallback(
@@ -212,7 +226,9 @@ export function FullView({
   const selectedText = useMemo(() => {
     const sel = selection.selected
     const element = sel ? elements[sel.pageId]?.find((e) => e.id === sel.elementId) : undefined
-    return sel && element?.kind === 'text' ? { pageId: sel.pageId, element } : null
+    return sel && (element?.kind === 'text' || element?.kind === 'callout')
+      ? { pageId: sel.pageId, element }
+      : null
   }, [selection.selected, elements])
   const pageSize = useCallback(
     (pageId: string) => {
@@ -231,7 +247,11 @@ export function FullView({
       const size = pageSize(selectedText.pageId)
       if (!size) return
       onReplaceElement(selectedText.pageId, selectedText.element.id, (e) =>
-        e.kind === 'text' ? restyledTextElement(e, style, size.w, size.h) : e
+        e.kind === 'text'
+          ? restyledTextElement(e, style, size.w, size.h)
+          : e.kind === 'callout'
+            ? restyledCallout(e, style, size.w, size.h)
+            : e
       )
     },
     [edit, selectedText, pageSize, onReplaceElement]
@@ -404,6 +424,8 @@ export function FullView({
             markLook={edit.markLook}
             onMarkLook={edit.setMarkLook}
             textSelected={!!selectedText}
+            measureScale={edit.measureScale}
+            onMeasureScale={edit.setMeasureScale}
           />
         }
         runClose={controls.runClose}
@@ -416,6 +438,18 @@ export function FullView({
       />
       {sidebarOpen && !animating && <FullViewSidebar doc={doc} current={pi} onGo={goToPage} />}
       {edit.editing && isMarkTool(edit.tool) && <ToolCursor tool={edit.tool} />}
+      {calibration !== null && (
+        <CalibrateDialog
+          lengthPoints={calibration}
+          unit={edit.measureScale.unit}
+          onCancel={() => setCalibration(null)}
+          onConfirm={(scale) => {
+            edit.setMeasureScale(scale)
+            setCalibration(null)
+            edit.toggleTool('distance')
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -1272,3 +1272,21 @@
 .annotate-select option {
   background: var(--overlay-strong);
 }
+
+.calibrate-input {
+  flex: 1;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid var(--hairline);
+  background: var(--group-bg);
+  color: var(--ink);
+  font: inherit;
+}
+
+.annotate-text-btn {
+  width: auto;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+}

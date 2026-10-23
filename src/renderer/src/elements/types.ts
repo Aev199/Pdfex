@@ -1,6 +1,6 @@
 import type { MarkKind } from '../edit/types'
 
-export type ElementKind = 'ink' | 'text' | 'shape'
+export type ElementKind = 'ink' | 'text' | 'shape' | 'measure' | 'callout'
 
 export interface ElementPoint {
   x: number
@@ -72,6 +72,49 @@ export interface ShapeElement {
   bbox: ElementRect
 }
 
+export type MeasureMode = 'distance' | 'path' | 'area'
+export type MeasureUnit = 'mm' | 'cm' | 'm'
+
+// How sheet distances turn into real ones.
+export interface MeasureScale {
+  // Real length, in `unit`, of one PDF point on the sheet.
+  perPoint: number
+  unit: MeasureUnit
+  // "1:100", or "calibrated" when taken from a known dimension.
+  label: string
+}
+
+// A length, a chain of lengths or an enclosed area on a drawing; its label
+// is worked out from the points and the scale it was measured with.
+export interface MeasureElement {
+  id: string
+  kind: 'measure'
+  number: number
+  mode: MeasureMode
+  points: ElementPoint[]
+  color: string
+  strokeWidth: number
+  scale: MeasureScale
+  bbox: ElementRect
+}
+
+// Text in a frame with an arrow to the point it is about.
+export interface CalloutElement {
+  id: string
+  kind: 'callout'
+  number: number
+  // Tip of the arrow.
+  anchor: ElementPoint
+  // Top left of the text, inside the frame.
+  origin: ElementPoint
+  text: string
+  color: string
+  fontSize: number
+  font?: TextFont
+  bold?: boolean
+  bbox: ElementRect
+}
+
 // Pen and shape colour and line width, chosen in the annotation toolbar.
 export interface DrawStyle {
   color: string
@@ -81,7 +124,7 @@ export interface DrawStyle {
 export const DRAW_COLORS = ['#16161c', '#e5322d', '#1f6feb', '#1a9b4b', '#f59f00', '#8e44ad']
 export const DRAW_WIDTHS = [1, 2, 4, 8]
 
-export type PageElement = InkElement | TextElement | ShapeElement
+export type PageElement = InkElement | TextElement | ShapeElement | MeasureElement | CalloutElement
 
 export type ElementMap = Record<string, PageElement[]>
 

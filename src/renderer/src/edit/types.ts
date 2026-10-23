@@ -1,12 +1,37 @@
 export type MarkKind = 'highlight' | 'redact'
 
-// Freehand pen, straight shapes and the eraser for both. ('draw' stays the
-// signature tool: always black, always fine.)
-export type AnnotateTool = 'pen' | 'line' | 'arrow' | 'rect' | 'ellipse' | 'eraser'
+// Freehand pen, straight shapes, callouts, measurements and the eraser for
+// all of them. ('draw' stays the signature tool: always black, always fine.)
+export type AnnotateTool =
+  | 'pen'
+  | 'line'
+  | 'arrow'
+  | 'rect'
+  | 'ellipse'
+  | 'callout'
+  | 'distance'
+  | 'path'
+  | 'area'
+  | 'eraser'
 
-export type EditTool = MarkKind | 'draw' | 'text' | AnnotateTool
+// 'calibrate': drawing a known dimension to set the measuring scale.
+export type EditTool = MarkKind | 'draw' | 'text' | 'calibrate' | AnnotateTool
 
-export const ANNOTATE_TOOLS: AnnotateTool[] = ['pen', 'line', 'arrow', 'rect', 'ellipse', 'eraser']
+export const ANNOTATE_TOOLS: AnnotateTool[] = [
+  'pen',
+  'line',
+  'arrow',
+  'rect',
+  'ellipse',
+  'callout',
+  'distance',
+  'path',
+  'area',
+  'eraser'
+]
+
+export const isMeasureTool = (tool: EditTool | null): tool is 'distance' | 'path' | 'area' =>
+  tool === 'distance' || tool === 'path' || tool === 'area'
 
 export const isShapeTool = (tool: EditTool | null): tool is 'line' | 'arrow' | 'rect' | 'ellipse' =>
   tool === 'line' || tool === 'arrow' || tool === 'rect' || tool === 'ellipse'
@@ -15,7 +40,10 @@ export const isMarkTool = (tool: EditTool | null): tool is MarkKind =>
   tool === 'highlight' || tool === 'redact'
 
 export const isElementTool = (tool: EditTool | null): boolean =>
-  tool === 'draw' || tool === 'text' || (ANNOTATE_TOOLS as (EditTool | null)[]).includes(tool)
+  tool === 'draw' ||
+  tool === 'text' ||
+  tool === 'calibrate' ||
+  (ANNOTATE_TOOLS as (EditTool | null)[]).includes(tool)
 
 export type MarkColor = 'yellow' | 'green' | 'pink' | 'blue' | 'orange' | 'red' | 'black'
 

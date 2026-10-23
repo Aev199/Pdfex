@@ -2,6 +2,7 @@ import { StandardFonts } from 'pdf-lib'
 import type { PDFDocument, PDFFont } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import { lookOf } from '../../elements/types'
+import { LABEL_CHARACTERS } from '../../elements/measures'
 import type { PageElement, TextElement, TextLook } from '../../elements/types'
 
 // Text of annotations is written with the PDF standard fonts when they can
@@ -48,7 +49,13 @@ export interface TextRun {
 }
 
 export const textRunsOf = (elements: PageElement[] | undefined): TextRun[] =>
-  (elements ?? []).flatMap((e) => (e.kind === 'text' ? [{ text: e.text, look: lookOf(e) }] : []))
+  (elements ?? []).flatMap((e): TextRun[] =>
+    e.kind === 'text' || e.kind === 'callout'
+      ? [{ text: e.text, look: lookOf(e) }]
+      : e.kind === 'measure'
+        ? [{ text: LABEL_CHARACTERS, look: { font: 'sans', bold: false } }]
+        : []
+  )
 
 const fileBytes = new Map<string, Promise<ArrayBuffer>>()
 
