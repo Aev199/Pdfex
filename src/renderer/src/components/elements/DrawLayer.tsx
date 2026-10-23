@@ -1,18 +1,21 @@
 import { useRef, useState } from 'react'
 import { refineInkPoints, smoothPathData } from '../../elements/geometry'
 import { INK_COLOR, INK_STROKE_WIDTH } from '../../elements/types'
-import type { ElementPoint } from '../../elements/types'
+import type { DrawStyle, ElementPoint } from '../../elements/types'
 
 interface DrawLayerProps {
   naturalWidth: number
   naturalHeight: number
   onCommit: (points: ElementPoint[]) => void
+  // Pen colour and width; the signature tool leaves it at the ink default.
+  style?: DrawStyle
 }
 
 export function DrawLayer({
   naturalWidth,
   naturalHeight,
-  onCommit
+  onCommit,
+  style
 }: DrawLayerProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const [stroke, setStroke] = useState<ElementPoint[] | null>(null)
@@ -60,8 +63,8 @@ export function DrawLayer({
           <path
             d={smoothPathData(refineInkPoints(stroke), naturalWidth, naturalHeight)}
             fill="none"
-            stroke={INK_COLOR}
-            strokeWidth={INK_STROKE_WIDTH}
+            stroke={style?.color ?? INK_COLOR}
+            strokeWidth={style?.strokeWidth ?? INK_STROKE_WIDTH}
             strokeLinecap="round"
             strokeLinejoin="round"
           />

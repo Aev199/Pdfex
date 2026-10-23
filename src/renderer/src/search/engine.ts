@@ -29,6 +29,8 @@ export interface SearchEngine {
   setLanguage: (lang: string) => void
   getOcrWords: (sourceKey: string) => OcrWord[] | undefined
   ocrStatus: (sourceKey: string) => OcrStatus
+  // Start recognizing scanned pages (until then they are only queued).
+  activateOcr: () => void
   dispose: () => void
 }
 
@@ -45,6 +47,12 @@ interface OcrJob {
 }
 
 const OCR_CONCURRENCY = 2
+
+// OCR results outlive any one engine: switching tabs remounts the workspace
+// (and its engine), and recognizing a 400-page scan again would take minutes.
+// Keyed by language and source page; sources keep their ids across tabs.
+const ocrCache = new Map<string, { text: string; words: OcrWord[] }>()
+const OCR_CACHE_MAX = 5000
 
 export function createSearchEngine({
   onChange,
@@ -63,6 +71,9 @@ export function createSearchEngine({
   const pagesBySource = new Map<string, Set<string>>()
   const sourceRef = new Map<string, OcrJob>()
 
+  // OCR is CPU- and memory-heavy (a 400-page scan keeps two recognizers busy
+  // for minutes), so it waits until someone actually searches or asks.
+  let ocrActive = false
   let ocrInFlight = 0
   let jobSeq = 0
   let lang = DEFAULT_OCR_LANGUAGE
@@ -91,6 +102,14 @@ export function createSearchEngine({
 
   function enqueueOcr(job: OcrJob): void {
     if (ocrQueued.has(job.key)) return
+    const cached = ocrCache.get(`${lang}|${job.key}`)
+    if (cached) {
+      sourceOcr.set(job.key, cached.text)
+      sourceOcrWords.set(job.key, cached.words)
+      applySource(job.key)
+      onChange()
+      return
+    }
     ocrQueued.add(job.key)
     ocrQueue.push(job)
     reportProgress()
@@ -98,6 +117,7 @@ export function createSearchEngine({
   }
 
   function pumpOcr(): void {
+    if (!ocrActive) return
     while (ocrInFlight < OCR_CONCURRENCY && ocrQueue.length > 0) {
       const job = ocrQueue.shift()!
       ocrInFlight++
@@ -106,6 +126,9 @@ export function createSearchEngine({
       ensureClient()
         .recognize(job.pdf, job.pageIndex, jobId)
         .then(({ text, words }) => {
+          const cacheKey = `${lang}|${job.key}`
+          if (ocrCache.size >= OCR_CACHE_MAX) ocrCache.delete(ocrCache.keys().next().value!)
+          ocrCache.set(cacheKey, { text: normalizeText(text), words })
           if (!pagesBySource.has(job.key)) return
           sourceOcr.set(job.key, normalizeText(text))
           sourceOcrWords.set(job.key, words)
@@ -303,6 +326,12 @@ export function createSearchEngine({
       if (sourceOcrWords.has(sourceKey)) return 'done'
       if (scanned.has(sourceKey)) return 'pending'
       return sourceBorn.has(sourceKey) ? 'none' : 'unknown'
+    },
+
+    activateOcr() {
+      if (ocrActive) return
+      ocrActive = true
+      pumpOcr()
     },
 
     dispose() {

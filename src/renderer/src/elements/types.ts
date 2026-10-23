@@ -1,6 +1,6 @@
 import type { MarkKind } from '../edit/types'
 
-export type ElementKind = 'ink' | 'text'
+export type ElementKind = 'ink' | 'text' | 'shape'
 
 export interface ElementPoint {
   x: number
@@ -42,7 +42,31 @@ export interface TextElement {
   bbox: ElementRect
 }
 
-export type PageElement = InkElement | TextElement
+export type ShapeKind = 'line' | 'arrow' | 'rect' | 'ellipse'
+
+// A straight-edged mark drawn from one corner (or end) to the other.
+export interface ShapeElement {
+  id: string
+  kind: 'shape'
+  number: number
+  shape: ShapeKind
+  color: string
+  strokeWidth: number
+  from: ElementPoint
+  to: ElementPoint
+  bbox: ElementRect
+}
+
+// Pen and shape colour and line width, chosen in the annotation toolbar.
+export interface DrawStyle {
+  color: string
+  strokeWidth: number
+}
+
+export const DRAW_COLORS = ['#16161c', '#e5322d', '#1f6feb', '#1a9b4b', '#f59f00', '#8e44ad']
+export const DRAW_WIDTHS = [1, 2, 4, 8]
+
+export type PageElement = InkElement | TextElement | ShapeElement
 
 export type ElementMap = Record<string, PageElement[]>
 

@@ -1,13 +1,14 @@
 import { useCallback, useRef } from 'react'
 import type { Mark, MarkMap } from '../edit/types'
 import type { PageElement } from '../elements/types'
-import type { PdfSource } from '../types'
+import type { DocEntry, PdfSource } from '../types'
 
 export const ACTIONS = {
   MARK: 'mark',
   MOVE_PAGE: 'move-page',
   ELEMENT: 'element',
-  PAGE_SOURCE: 'page-source'
+  PAGE_SOURCE: 'page-source',
+  DOCS: 'docs'
 } as const
 
 export interface PagePlacement {
@@ -49,7 +50,7 @@ export type ElementUndoEntry =
     }
   | {
       action: typeof ACTIONS.ELEMENT
-      value: 'add-batch'
+      value: 'add-batch' | 'remove-batch'
       payload: { pageId: string; elements: PageElement[] }
     }
   | {
@@ -69,13 +70,27 @@ export type PageSourceUndoEntry = {
   payload: { pageId: string; before: PageSourceSwap; after: PageSourceSwap }
 }
 
-export type UndoEntry = MarkUndoEntry | MovePageUndoEntry | ElementUndoEntry | PageSourceUndoEntry
+// Any other change to the document list (import, delete, duplicate, rename,
+// reorder…): the whole list before and after. Lists share their page and
+// document objects, so a snapshot costs an array, not a copy of the content.
+export type DocsUndoEntry = {
+  action: typeof ACTIONS.DOCS
+  value: string
+  payload: { before: DocEntry[]; after: DocEntry[] }
+}
 
-const UNDO_CAP = 30
+export type UndoEntry =
+  | MarkUndoEntry
+  | MovePageUndoEntry
+  | ElementUndoEntry
+  | PageSourceUndoEntry
+  | DocsUndoEntry
 
-export function useUndoStack() {
-  const stackRef = useRef<UndoEntry[]>([])
-  const cursorRef = useRef(0)
+const UNDO_CAP = 100
+
+export function useUndoStack(initial?: { stack: UndoEntry[]; cursor: number }) {
+  const stackRef = useRef<UndoEntry[]>(initial ? [...initial.stack] : [])
+  const cursorRef = useRef(initial?.cursor ?? 0)
 
   const push = useCallback((entry: UndoEntry): void => {
     const stack = stackRef.current
@@ -99,7 +114,12 @@ export function useUndoStack() {
     return entry
   }, [])
 
-  return { push, undo, redo }
+  const snapshot = useCallback(
+    () => ({ stack: [...stackRef.current], cursor: cursorRef.current }),
+    []
+  )
+
+  return { push, undo, redo, snapshot }
 }
 
 export type UndoStack = ReturnType<typeof useUndoStack>

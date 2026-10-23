@@ -1,19 +1,24 @@
 import { useCallback, useRef, useState } from 'react'
 import type { MarkKind } from '../edit/types'
-import type { ElementMap, ElementPoint, PageElement } from '../elements/types'
+import type { DrawStyle, ElementMap, ElementPoint, PageElement, ShapeKind } from '../elements/types'
 import { translateElement } from '../elements/geometry'
 import { createInkElement, createTextElement, editedTextElement } from '../elements/create'
+import { createShapeElement } from '../elements/shapes'
 import { applyElementEntry } from '../elements/apply-entry'
 import { toggleMark } from '../elements/text-marks'
 import type { TextSpan } from '../elements/text-marks'
 import { ACTIONS } from './undo'
 import type { ElementUndoEntry, UndoEntry } from './undo'
 
-export function useElements(pushUndo: (entry: UndoEntry) => void) {
-  const [elements, setElements] = useState<ElementMap>({})
+export function useElements(
+  pushUndo: (entry: UndoEntry) => void,
+  initial: ElementMap = {},
+  initialNextNumber = 1
+) {
+  const [elements, setElements] = useState<ElementMap>(initial)
   const elementsRef = useRef(elements)
   elementsRef.current = elements
-  const nextNumberRef = useRef(1)
+  const nextNumberRef = useRef(initialNextNumber)
 
   const addElement = useCallback(
     (pageId: string, element: PageElement | null): PageElement | null => {
@@ -28,9 +33,51 @@ export function useElements(pushUndo: (entry: UndoEntry) => void) {
   )
 
   const addInk = useCallback(
-    (pageId: string, points: ElementPoint[], pageWidth: number, pageHeight: number) =>
-      addElement(pageId, createInkElement(points, nextNumberRef.current, pageWidth, pageHeight)),
+    (
+      pageId: string,
+      points: ElementPoint[],
+      pageWidth: number,
+      pageHeight: number,
+      style?: DrawStyle
+    ) =>
+      addElement(
+        pageId,
+        createInkElement(points, nextNumberRef.current, pageWidth, pageHeight, style)
+      ),
     [addElement]
+  )
+
+  const addShape = useCallback(
+    (
+      pageId: string,
+      shape: ShapeKind,
+      from: ElementPoint,
+      to: ElementPoint,
+      pageWidth: number,
+      pageHeight: number,
+      style: DrawStyle
+    ) =>
+      addElement(
+        pageId,
+        createShapeElement(shape, from, to, nextNumberRef.current, pageWidth, pageHeight, style)
+      ),
+    [addElement]
+  )
+
+  // The eraser: one undo step for everything wiped in one stroke.
+  const removeElements = useCallback(
+    (pageId: string, ids: string[]) => {
+      const map = elementsRef.current
+      const gone = (map[pageId] ?? []).filter((e) => ids.includes(e.id))
+      if (gone.length === 0) return
+      pushUndo({
+        action: ACTIONS.ELEMENT,
+        value: 'remove-batch',
+        payload: { pageId, elements: gone }
+      })
+      setElements({ ...map, [pageId]: map[pageId].filter((e) => !ids.includes(e.id)) })
+    },
+    [pushUndo]
   )
 
   const addText = useCallback(
@@ -154,9 +201,29 @@ export function useElements(pushUndo: (entry: UndoEntry) => void) {
     [applyEntry]
   )
 
+  // Give duplicated pages (new id -> original id) the elements of their originals.
+  // `from` holds the originals' annotations when they come from elsewhere
+  // (pages pasted from another tab).
+  const copyToPages = useCallback((origins: Map<string, string>, from?: ElementMap) => {
+    const map = elementsRef.current
+    let next: ElementMap | null = null
+    for (const [copyId, originId] of origins) {
+      const list = (from ?? map)[originId]
+      if (!list?.length) continue
+      next ??= { ...map }
+      next[copyId] = list.map((e) => ({ ...e, id: crypto.randomUUID() }))
+    }
+    if (next) setElements(next)
+  }, [])
+
   return {
     elements,
+    elementsRef,
+    copyToPages,
+    nextNumberRef,
     addInk,
+    addShape,
+    removeElements,
     addText,
     addTexts,
     removeElement,

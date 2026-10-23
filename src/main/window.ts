@@ -1,4 +1,4 @@
-import { shell, BrowserWindow, nativeTheme } from 'electron'
+import { shell, BrowserWindow, ipcMain, nativeTheme } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { GLASS_CONFIG, FALLBACK_BG, applyNativeGlass } from './native/glass'
@@ -53,6 +53,26 @@ export function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
   applyNativeGlass(mainWindow)
+  // Give the renderer one chance to write the session before the window goes
+  // away, so the last edits aren't lost to the autosave debounce. Bounded so a
+  // hung renderer can never keep the window from closing.
+  let flushed = false
+  mainWindow.on('close', (event) => {
+    if (flushed || !rendererReady) return
+    event.preventDefault()
+    flushed = true
+    const win = mainWindow
+    if (!win) return
+    const finish = (): void => {
+      ipcMain.removeListener('pdfx:session-flushed', finish)
+      clearTimeout(timer)
+      if (!win.isDestroyed()) win.close()
+    }
+    const timer = setTimeout(finish, 4000)
+    ipcMain.once('pdfx:session-flushed', finish)
+    win.webContents.send('pdfx:flush-session')
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
     rendererReady = false

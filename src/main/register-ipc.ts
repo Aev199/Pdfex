@@ -1,4 +1,4 @@
-import { ipcMain, dialog, clipboard } from 'electron'
+import { ipcMain, dialog, clipboard, nativeImage, shell, app } from 'electron'
 import { basename, isAbsolute } from 'path'
 import { existsSync } from 'fs'
 import { writeFile } from 'fs/promises'
@@ -6,11 +6,65 @@ import { markupToPdf } from './markup'
 import { OpenedFile, IMPORTABLE, readFiles, expandDropPaths } from './file-intake'
 import { clipboardFilePaths } from './clipboard'
 import { readResource } from './resource'
+import { fileInfo, readSource, statSource } from './source-files'
+import { listExternalApps, openExternal, resolveFile } from './open-with'
+import { runPrint, spoolPage } from './print'
+import { converterFor, officeConvert } from './office'
+import type { OpenAction, OpenSource } from './open-with'
+import { loadAutosave, openSessionFile, saveSession, writeSessionFile } from './session'
+import type { SessionManifest } from './session'
 import { getMainWindow, setRendererReady, sendOpenPaths } from './window'
+import { getSettings, onSettingsChanged, updateSettings } from './settings'
+import * as updater from './updates/updater'
+import type { Settings } from '../preload/app-types'
+import type { UpdateAction } from '../preload'
 
 const MAX_WRITE_BYTES = 1024 * 1024 * 1024 // 1 GiB cap on a single IPC write
 
 export function registerIpc(getPending: () => string[], clearPending: () => void): void {
+  ipcMain.handle('pdfx:settings-get', () => getSettings())
+  ipcMain.handle('pdfx:settings-set', (_event, patch: Partial<Settings>) =>
+    updateSettings(patch && typeof patch === 'object' ? patch : {})
+  )
+  onSettingsChanged((settings) => getMainWindow()?.webContents.send('pdfx:settings', settings))
+  ipcMain.handle('pdfx:app-info', () => updater.appInfo())
+  ipcMain.handle('pdfx:open-data-folder', () => shell.openPath(app.getPath('userData')))
+  ipcMain.handle('pdfx:updates-state', () => updater.updateState())
+  ipcMain.handle('pdfx:updates-action', async (_event, action: UpdateAction) => {
+    switch (action) {
+      case 'check':
+        return updater.check(true)
+      case 'download':
+        return updater.download()
+      case 'skip':
+        return updater.skip()
+      case 'dismiss':
+        return updater.dismiss()
+      case 'show':
+        return updater.show()
+      case 'restart':
+        return updater.restart()
+      case 'rollback':
+        return updater.rollback()
+      case 'cancel':
+        return updater.cancelPending()
+      case 'browser':
+        return updater.downloadInBrowser()
+      case 'page': {
+        const phase = updater.updateState().phase
+        const page =
+          phase.kind === 'available' || phase.kind === 'ready'
+            ? phase.offer.page
+            : phase.kind === 'failed'
+              ? phase.offer?.page
+              : undefined
+        if (page?.startsWith('https://')) await shell.openExternal(page)
+        else if (page) await shell.openPath(page)
+        return
+      }
+    }
+  })
+
   ipcMain.handle('pdfx:renderer-ready', async () => {
     setRendererReady(true)
     const paths = getPending()
@@ -49,6 +103,68 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
     async (_event, paths: string[]): Promise<OpenedFile[]> =>
       readFiles(await expandDropPaths(paths))
   )
+
+  ipcMain.handle('pdfx:read-source', (_event, path: unknown) => readSource(path))
+
+  ipcMain.handle('pdfx:file-info', (_event, path: unknown) => fileInfo(path))
+
+  ipcMain.handle('pdfx:stat-sources', (_event, paths: unknown) =>
+    Array.isArray(paths) ? Promise.all(paths.slice(0, 10_000).map(statSource)) : []
+  )
+
+  ipcMain.handle('pdfx:session-load', () => loadAutosave())
+
+  ipcMain.handle(
+    'pdfx:session-save',
+    (_event, manifest: SessionManifest, blobs: Record<string, Uint8Array>) =>
+      saveSession(manifest, blobs ?? {})
+  )
+
+  ipcMain.handle(
+    'pdfx:session-write-file',
+    (_event, path: string, manifest: SessionManifest, blobs: Record<string, Uint8Array>) =>
+      writeSessionFile(path, manifest, blobs ?? {})
+  )
+
+  ipcMain.handle('pdfx:session-open-file', (_event, path: unknown) => openSessionFile(path))
+
+  ipcMain.handle(
+    'pdfx:print-spool',
+    (_event, id: string, index: number, jpeg: Uint8Array, widthPt: number, heightPt: number) =>
+      spoolPage(id, index, jpeg, widthPt, heightPt)
+  )
+
+  ipcMain.handle('pdfx:print-run', (_event, id: string, title: string) =>
+    runPrint(id, String(title ?? 'PDFx'))
+  )
+
+  ipcMain.handle('pdfx:office-converter', (_event, kind: unknown) =>
+    kind === 'word' || kind === 'excel' || kind === 'powerpoint' ? converterFor(kind) : null
+  )
+
+  ipcMain.handle('pdfx:office-convert', (_event, ext: string, data: Uint8Array) =>
+    officeConvert(ext, data)
+  )
+
+  ipcMain.handle('pdfx:list-external-apps', () => listExternalApps())
+
+  ipcMain.handle('pdfx:open-external', (_event, action: OpenAction, source: OpenSource) =>
+    openExternal(action, source)
+  )
+
+  // Dragging a document out of the window drops a real PDF into Explorer.
+  ipcMain.on('pdfx:drag-out', (event, source: OpenSource, iconDataUrl: string) => {
+    void (async () => {
+      try {
+        const file = await resolveFile(source)
+        const icon = nativeImage.createFromDataURL(String(iconDataUrl))
+        if (icon.isEmpty()) return
+        event.sender.startDrag({ file, icon })
+      } catch (error) {
+        console.error('drag-out failed', error)
+      }
+    })()
+  })
 
   ipcMain.handle('pdfx:read-resource', (_event, htmlPath: string, ref: string) =>
     readResource(htmlPath, ref)
@@ -91,6 +207,30 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
           extensions: [
             'pdf',
             'pdfx',
+            'pdfxs',
+            'doc',
+            'docx',
+            'docm',
+            'dot',
+            'dotx',
+            'dotm',
+            'odt',
+            'xls',
+            'xlsx',
+            'xlsm',
+            'xlsb',
+            'xlt',
+            'xltx',
+            'xltm',
+            'ods',
+            'ppt',
+            'pptx',
+            'pptm',
+            'pps',
+            'ppsx',
+            'pot',
+            'potx',
+            'odp',
             'png',
             'jpg',
             'jpeg',

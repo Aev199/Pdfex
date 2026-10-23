@@ -30,6 +30,8 @@ export interface SourceExportPage {
   pageIndex: number
   marks?: Mark[]
   elements?: PageElement[]
+  // Extra clockwise turn chosen in PDFx (0, 90, 180, 270).
+  rotation?: number
 }
 
 export interface RasterExportPage {
@@ -38,6 +40,7 @@ export interface RasterExportPage {
   width: number
   height: number
   elements?: PageElement[]
+  rotation?: number
 }
 
 export type ExportPage = SourceExportPage | RasterExportPage

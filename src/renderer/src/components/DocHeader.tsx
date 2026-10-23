@@ -9,6 +9,9 @@ interface DocHeaderProps {
   onMove: (docId: string, direction: -1 | 1) => void
   onRemove: (docId: string) => void
   onRename: (docId: string, name: string) => void
+  onContextMenu: (docId: string, x: number, y: number) => void
+  onHover: (docId: string | null) => void
+  onDragOut: (docId: string) => void
 }
 
 function DocHeaderImpl({
@@ -17,7 +20,10 @@ function DocHeaderImpl({
   total,
   onMove,
   onRemove,
-  onRename
+  onRename,
+  onContextMenu,
+  onHover,
+  onDragOut
 }: DocHeaderProps): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(doc.name)
@@ -46,8 +52,31 @@ function DocHeaderImpl({
   }
 
   return (
-    <header className="doc-header">
-      <span className="doc-index">{String(index + 1).padStart(2, '0')}</span>
+    <header
+      className="doc-header"
+      // The title floats in the overlay layer, outside the document box, so
+      // it reports hover itself or the details ribbon would drop on it.
+      onMouseEnter={() => onHover(doc.id)}
+      onMouseLeave={() => onHover(null)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onContextMenu(doc.id, e.clientX, e.clientY)
+      }}
+    >
+      <span
+        className="doc-index"
+        title="Drag out to save as PDF"
+        draggable
+        onDragStart={(e) => {
+          // The OS file drag is started by the main process instead, so the
+          // drop lands in Explorer as a real file.
+          e.preventDefault()
+          onDragOut(doc.id)
+        }}
+      >
+        {String(index + 1).padStart(2, '0')}
+      </span>
       {editing ? (
         <input
           ref={inputRef}

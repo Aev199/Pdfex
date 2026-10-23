@@ -1,10 +1,14 @@
 import { useEffect } from 'react'
-import { ARROW_PAN, clamp, WHEEL_ZOOM_SPEED, ZOOM_STEP } from './geometry'
+import { ARROW_PAN, clamp, MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from './geometry'
+import type { View } from './geometry'
+import { getSettings } from '../../app/settings-store'
+import { WheelAnimator, interpretWheel } from '../../canvas/wheel-input'
 import type { FullViewControls } from './use-full-view-controls'
 
 interface InputOptions extends FullViewControls {
   scrollRef: React.RefObject<HTMLDivElement | null>
   zoomedRef: React.MutableRefObject<boolean>
+  viewRef: React.MutableRefObject<View>
   phaseRef: React.MutableRefObject<'opening' | 'open' | 'closing'>
   editingRef: React.MutableRefObject<boolean>
   finishEdit: () => void
@@ -16,7 +20,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 }
 
 export function useFullViewInput(opts: InputOptions): void {
-  const { scrollRef, zoomedRef, phaseRef, editingRef, finishEdit } = opts
+  const { scrollRef, zoomedRef, viewRef, phaseRef, editingRef, finishEdit } = opts
   const { resetView, applyZoom, panBy, navByKey, runClose } = opts
 
   useEffect(() => {
@@ -58,23 +62,33 @@ export function useFullViewInput(opts: InputOptions): void {
   useEffect(() => {
     const sc = scrollRef.current
     if (!sc) return
+    const animator = new WheelAnimator({
+      zoomBy(factor, anchor) {
+        const before = viewRef.current.zoom
+        const after = clamp(before * factor, MIN_ZOOM, MAX_ZOOM)
+        applyZoom((z) => z * factor, { x: anchor[0], y: anchor[1] })
+        return after / before
+      },
+      panBy(dx, dy) {
+        panBy(-dx, -dy)
+      }
+    })
     const onWheel = (event: WheelEvent): void => {
       if (phaseRef.current !== 'open') {
         event.preventDefault()
         return
       }
-      if (event.ctrlKey || event.metaKey) {
+      const intent = interpretWheel(event, sc.clientHeight, getSettings().wheel === 'zoom')
+      if (intent.kind === 'zoom') {
         event.preventDefault()
-        const dy = clamp(event.deltaY, -50, 50)
-        applyZoom((z) => z * Math.pow(2, -dy * WHEEL_ZOOM_SPEED), {
-          x: event.clientX,
-          y: event.clientY
-        })
+        if (intent.smooth) animator.zoom(intent.factor, [event.clientX, event.clientY])
+        else applyZoom((z) => z * intent.factor, { x: event.clientX, y: event.clientY })
         return
       }
       if (zoomedRef.current) {
         event.preventDefault()
-        panBy(-event.deltaX, -event.deltaY)
+        if (intent.smooth) animator.pan(intent.dx, intent.dy)
+        else panBy(-intent.dx, -intent.dy)
         return
       }
       if (editingRef.current && Math.abs(event.deltaY) >= Math.abs(event.deltaX)) {
@@ -83,6 +97,9 @@ export function useFullViewInput(opts: InputOptions): void {
       }
     }
     sc.addEventListener('wheel', onWheel, { passive: false })
-    return () => sc.removeEventListener('wheel', onWheel)
+    return () => {
+      sc.removeEventListener('wheel', onWheel)
+      animator.stop()
+    }
   }, [applyZoom, panBy])
 }

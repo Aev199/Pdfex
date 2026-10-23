@@ -3,7 +3,8 @@ import { pointer, select } from 'd3-selection'
 import { zoomIdentity, zoomTransform, type ZoomBehavior } from 'd3-zoom'
 import { createZoomBehavior } from './create-zoom-behavior'
 import { computeFitTransform } from './fit-transform'
-import { WHEEL_ZOOM_SPEED } from './zoom-constants'
+import { getSettings } from '../app/settings-store'
+import { WheelAnimator, interpretWheel } from './wheel-input'
 
 export {
   MIN_SCALE,
@@ -11,7 +12,6 @@ export {
   PAN_MARGIN,
   FIT_MARGIN,
   TARGET_VISIBLE_DOCS,
-  WHEEL_ZOOM_SPEED,
   BUTTON_ZOOM_FACTOR
 } from './zoom-constants'
 
@@ -41,9 +41,11 @@ export function useZoomBehavior({
   onSettle
 }: ZoomBehaviorArgs): {
   zoomRef: RefObject<ZoomBehavior<HTMLDivElement, unknown> | null>
+  animatorRef: RefObject<WheelAnimator | null>
   fitTransform: () => ReturnType<typeof zoomIdentity.translate>
 } {
   const zoomRef = useRef<ZoomBehavior<HTMLDivElement, unknown> | null>(null)
+  const animatorRef = useRef<WheelAnimator | null>(null)
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTick = useRef(0)
   const onScaleRef = useRef(onScaleChange)
@@ -74,17 +76,39 @@ export function useZoomBehavior({
     sel.call(zoomBehavior)
     sel.on('dblclick.zoom', null)
 
+    const animator = new WheelAnimator({
+      zoomBy(factor, anchor) {
+        const before = zoomTransform(vp).k
+        zoomBehavior.scaleBy(sel, factor, anchor)
+        return zoomTransform(vp).k / before
+      },
+      panBy(dx, dy) {
+        const k = zoomTransform(vp).k
+        zoomBehavior.translateBy(sel, -dx / k, -dy / k)
+      }
+    })
+
+    animatorRef.current = animator
+
     const onWheel = (event: WheelEvent): void => {
       event.preventDefault()
-      const [px, py] = pointer(event, vp)
-      if (event.ctrlKey || event.metaKey) {
-        const dy = Math.max(-50, Math.min(50, event.deltaY))
-        zoomBehavior.scaleBy(sel, Math.pow(2, -dy * WHEEL_ZOOM_SPEED), [px, py])
+      const intent = interpretWheel(event, vp.clientHeight, getSettings().wheel === 'zoom')
+      if (intent.kind === 'zoom') {
+        const anchor = pointer(event, vp) as [number, number]
+        if (intent.smooth) animator.zoom(intent.factor, anchor)
+        else zoomBehavior.scaleBy(sel, intent.factor, anchor)
+      } else if (intent.smooth) {
+        animator.pan(intent.dx, intent.dy)
       } else {
         const k = zoomTransform(vp).k
-        zoomBehavior.translateBy(sel, -event.deltaX / k, -event.deltaY / k)
+        zoomBehavior.translateBy(sel, -intent.dx / k, -intent.dy / k)
       }
     }
+    // A grab ends any glide still in flight so the canvas doesn't drift
+    // away from under the pointer.
+    zoomBehavior.on('start.wheel', (event) => {
+      if (event.sourceEvent && event.sourceEvent.type !== 'wheel') animator.stop()
+    })
     vp.addEventListener('wheel', onWheel, { passive: false })
 
     const resize = new ResizeObserver(() => {
@@ -97,11 +121,12 @@ export function useZoomBehavior({
 
     return () => {
       vp.removeEventListener('wheel', onWheel)
+      animator.stop()
       resize.disconnect()
       sel.on('.zoom', null)
       if (idleTimer.current) clearTimeout(idleTimer.current)
     }
   }, [])
 
-  return { zoomRef, fitTransform }
+  return { zoomRef, animatorRef, fitTransform }
 }

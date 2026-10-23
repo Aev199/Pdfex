@@ -60,6 +60,41 @@ export function movePageToNewDoc(
   return [...next.slice(0, insertAt), newDoc, ...next.slice(insertAt)]
 }
 
+// Ctrl-drag: a copy of the page (new id) lands at the drop target, the
+// original stays put. Index counts every page of the target document.
+export function copyPageInto(
+  docs: DocEntry[],
+  source: PageRef,
+  copyId: string,
+  targetDocId: string,
+  index: number
+): DocEntry[] {
+  const page = docs.find((d) => d.id === source.docId)?.pages.find((p) => p.id === source.pageId)
+  if (!page || !docs.some((d) => d.id === targetDocId)) return docs
+  const copy = { ...page, id: copyId }
+  return docs.map((d) => {
+    if (d.id !== targetDocId) return d
+    const at = Math.max(0, Math.min(d.pages.length, index))
+    return { ...d, pages: [...d.pages.slice(0, at), copy, ...d.pages.slice(at)] }
+  })
+}
+
+export function copyPageToNewDoc(
+  docs: DocEntry[],
+  source: PageRef,
+  copyId: string,
+  docIndex: number,
+  newDocId: string
+): DocEntry[] {
+  const sourceDoc = docs.find((d) => d.id === source.docId)
+  const page = sourceDoc?.pages.find((p) => p.id === source.pageId)
+  if (!sourceDoc || !page) return docs
+  const name = uniqueDocName(sourceDoc.name, new Set(docs.map((d) => d.name)))
+  const newDoc: DocEntry = { id: newDocId, name, pages: [{ ...page, id: copyId }] }
+  const at = Math.max(0, Math.min(docs.length, docIndex))
+  return [...docs.slice(0, at), newDoc, ...docs.slice(at)]
+}
+
 export function pagePlacement(docs: DocEntry[], pageId: string): PagePlacement | null {
   const docIndex = docs.findIndex((d) => d.pages.some((p) => p.id === pageId))
   if (docIndex === -1) return null

@@ -3,6 +3,7 @@ import type { PageElement, TextElement } from '../../elements/types'
 import type { TextSpan } from '../../elements/text-marks'
 import { ElementPath } from './ElementPath'
 import { ElementText } from './ElementText'
+import { ElementShape } from './ElementShape'
 
 interface ElementNodeProps {
   element: PageElement
@@ -29,6 +30,7 @@ export function ElementNode({
   onEdit,
   ...shared
 }: ElementNodeProps): React.JSX.Element {
+  if (element.kind === 'shape') return <ElementShape element={element} {...shared} />
   return element.kind === 'ink' ? (
     <ElementPath element={element} {...shared} />
   ) : (

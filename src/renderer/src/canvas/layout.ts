@@ -4,7 +4,10 @@ export const BASE_PAGE_HEIGHT = 280
 export const PAGE_GAP = 18
 export const CARD_PAD_X = 16 + 6
 const CARD_PAD_TOP = 10
-const HEADER_BLOCK = 32
+// Room for the document title, which counter-scales up to 2x as the canvas
+// zooms out (see .doc-header): 32px at 100% plus the 42px it can grow into.
+// Keep in sync with .doc-row's top padding.
+const HEADER_BLOCK = 74
 const CARD_PAD_BOTTOM = 20
 export const DOC_GAP_Y = 34
 
@@ -45,9 +48,11 @@ function docWidth(doc: DocEntry): number {
 
 export const DOC_HEIGHT = CARD_PAD_TOP + HEADER_BLOCK + BASE_PAGE_HEIGHT + CARD_PAD_BOTTOM
 
-export function computeLayout(docs: DocEntry[]): CanvasLayout {
+// extraRows reserves slots below the documents for placeholder rows of files
+// still importing, so the canvas (and zoom-to-fit) already makes room.
+export function computeLayout(docs: DocEntry[], extraRows = 0): CanvasLayout {
   const widths = docs.map((doc) => Math.max(MIN_DOC_WIDTH, docWidth(doc)))
-  const contentWidth = Math.max(1, ...widths)
+  const contentWidth = Math.max(1, extraRows > 0 ? MIN_DOC_WIDTH : 1, ...widths)
 
   let y = 0
   const items: DocPlacement[] = docs.map((doc, i) => {
@@ -62,8 +67,9 @@ export function computeLayout(docs: DocEntry[]): CanvasLayout {
     return placement
   })
 
+  y += extraRows * (DOC_HEIGHT + DOC_GAP_Y)
   let contentHeight = Math.max(1, y - DOC_GAP_Y)
-  if (docs.length > 0) contentHeight += DOC_GAP_Y + DOC_HEIGHT
+  if (docs.length > 0 || extraRows > 0) contentHeight += DOC_GAP_Y + DOC_HEIGHT
   return { items, contentWidth, contentHeight, slotHeight: DOC_HEIGHT + DOC_GAP_Y }
 }
 

@@ -32,6 +32,8 @@ export interface FullViewControls {
   applyZoom: (nextZoom: (z: number) => number, focal?: { x: number; y: number }) => void
   panBy: (dx: number, dy: number) => void
   navByKey: (axis: 'x' | 'y', dir: 1 | -1) => void
+  // Jump to a page: document index and page index within it.
+  goTo: (di: number, pi: number) => void
   runClose: () => void
 }
 
@@ -123,5 +125,20 @@ export function useFullViewControls(opts: ControlsOptions): FullViewControls {
     window.setTimeout(onClose, TRANSITION_MS + 20)
   }, [onClose])
 
-  return { resetView, applyZoom, panBy, navByKey, runClose }
+  const goTo = useCallback((di: number, pi: number) => {
+    const sc = scrollRef.current
+    if (!sc) return
+    const tdi = clamp(di, 0, docsRef.current.length - 1)
+    const tpi = clamp(pi, 0, docsRef.current[tdi].pages.length - 1)
+    const docEl = sc.children[tdi] as HTMLElement | undefined
+    const slide = docEl?.children[tpi] as HTMLElement | undefined
+    if (!docEl || !slide) return
+    setView({ zoom: 1, x: 0, y: 0 })
+    const far = Math.abs(tpi - curRef.current.pi) > 3 || tdi !== curRef.current.di
+    const behavior = far ? 'auto' : 'smooth'
+    docEl.scrollTo({ left: slide.offsetLeft, behavior })
+    sc.scrollTo({ top: docEl.offsetTop, behavior })
+  }, [])
+
+  return { resetView, applyZoom, panBy, navByKey, goTo, runClose }
 }

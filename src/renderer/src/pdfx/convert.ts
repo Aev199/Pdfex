@@ -1,5 +1,6 @@
 import { imageToPdf, isImageBytes, isImageFile, stripImageExtension } from './images'
 import { buildMarkupPdf, isMarkupFile, stripMarkupExtension, type PageSize } from './markup'
+import { isOfficeFile, officeToPdf, stripOfficeExtension } from './office'
 
 export type { PageSize }
 
@@ -10,6 +11,11 @@ interface Converter {
 }
 
 const converters: Converter[] = [
+  {
+    match: (name) => isOfficeFile(name),
+    toPdf: (name, data) => officeToPdf(name, data),
+    rename: stripOfficeExtension
+  },
   {
     match: (name, data) => isImageFile(name) || isImageBytes(data),
     toPdf: (_name, data, fit) => imageToPdf(data, fit),

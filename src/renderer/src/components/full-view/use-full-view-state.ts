@@ -59,6 +59,8 @@ export function useFullViewState(
   zoomedRef.current = zoomed
   const phaseRef = useRef(phase)
   phaseRef.current = phase
+  const viewRef = useRef(view)
+  viewRef.current = view
 
   return {
     scrollRef,
@@ -71,6 +73,7 @@ export function useFullViewState(
     curRef,
     zoomedRef,
     phaseRef,
+    viewRef,
     current,
     setCurrent,
     viewport,

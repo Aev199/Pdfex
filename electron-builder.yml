@@ -2,11 +2,18 @@ appId: com.pdfx.app
 productName: PDFx
 directories:
   buildResources: build
+# Chromium locale packs: keep the UI languages we care about, drop ~40 others.
+electronLanguages:
+  - en-US
+  - ru
 files:
   - '**/*'
   - '!**/.vscode/*'
   - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{vitest.config.ts,vite.config.web.ts,dev-vars.ts}'
+  - '!.github/**'
+  - '!e2e/**'
   - '!{.prettierignore,.prettierrc.yaml,.editorconfig,dev-app-update.yml,README.md,SPEC.md}'
   - '!{.env,.env.*,.dev.vars,.dev.vars.example,.npmrc,pnpm-lock.yaml,yarn.lock}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
@@ -31,6 +38,19 @@ mac:
   category: public.app-category.productivity
 win:
   executableName: pdfx
+  # Portable only: unpack the ZIP and run pdfx.exe. No installer, no registry,
+  # settings and sessions go to the `data` folder next to the executable.
+  artifactName: PDFx-Windows-Portable.${ext}
+  target:
+    - target: zip
+      arch:
+        - x64
+  extraFiles:
+    - from: build/win/portable
+      to: '.'
+    # version.json from scripts/stamp-version.mjs: what the updater compares.
+    - from: build/stamp
+      to: '.'
 linux:
   target:
     - AppImage

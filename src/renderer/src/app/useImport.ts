@@ -1,42 +1,68 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { findConverter } from '../pdfx/convert'
-import { importIntoDocs, loadIncomingPages } from '../pdfx/source'
+import { fileMeta, importIntoDocs, loadIncomingPages } from '../pdfx/source'
 import { dedupeNames } from './names'
+import { ConvertError } from '../pdfx/office'
 import { applyExternalDrop } from './external-drop'
 import type { Collection } from './useCollection'
 import type { DropTarget } from '../canvas/layout'
-import type { IncomingFile } from './types'
+import type { IncomingFile, PendingImport } from './types'
 
 export function useImport(
   collection: Collection,
   setBusy: (busy: boolean) => void,
-  flash: (message: string) => void
+  flash: (message: string) => void,
+  onOpenSession: (path: string) => void
 ) {
   const { setDocs, docsRef, appendPagesToDoc, insertPagesIntoDoc, spliceDocsAfter } = collection
+  const { replaceDocPages } = collection
+  const [pending, setPending] = useState<PendingImport[]>([])
 
   const addFiles = useCallback(
-    async (files: IncomingFile[]) => {
+    async (incoming: IncomingFile[]) => {
+      // Session files open as tabs rather than as documents.
+      const sessions = incoming.filter((f) => /\.pdfxs$/i.test(f.name) && f.path)
+      for (const file of sessions) onOpenSession(file.path!)
+      const files = incoming.filter((f) => !sessions.includes(f))
       if (files.length === 0) return
       setBusy(true)
+      // Every file gets a placeholder row at once; each turns into its
+      // document as soon as it is read.
+      const rows = files.map((file) => ({
+        id: crypto.randomUUID(),
+        name: file.name,
+        pageCount: null as number | null
+      }))
+      setPending((prev) => [...prev, ...rows])
       const failed: string[] = []
-      for (const file of files) {
+      const reasons: string[] = []
+      for (const [i, file] of files.entries()) {
+        const row = rows[i]
         try {
           const conv = findConverter(file.name, file.data)
           const name = conv ? conv.rename(file.name) : file.name
           const data = conv
             ? await conv.toPdf(file.name, file.data, undefined, file.path)
             : file.data
-          const entries = await importIntoDocs(name, data)
+          const entries = await importIntoDocs(name, data, {
+            ...fileMeta(file, !!conv),
+            onPageCount: (pageCount) =>
+              setPending((prev) => prev.map((p) => (p.id === row.id ? { ...p, pageCount } : p)))
+          })
           setDocs((prev) => [...prev, ...dedupeNames(prev, entries)])
         } catch (error) {
           console.error(`Failed to import ${file.name}`, error)
-          failed.push(file.name)
+          if (error instanceof ConvertError) reasons.push(error.message)
+          else failed.push(file.name)
+        } finally {
+          setPending((prev) => prev.filter((p) => p.id !== row.id))
         }
       }
       setBusy(false)
-      if (failed.length > 0) flash(`Could not open ${failed.join(', ')}`)
+      if (failed.length > 0) reasons.push(`Could not open ${failed.join(', ')}`)
+      if (reasons.length > 0) flash(reasons.join('. '))
     },
-    [flash, setBusy, setDocs]
+    [flash, setBusy, setDocs, onOpenSession]
   )
 
   useEffect(() => {
@@ -62,7 +88,7 @@ export function useImport(
         appendPagesToDoc(docId, await loadIncomingPages(files, ref))
       } catch (error) {
         console.error('Add page failed', error)
-        flash('Could not add pages')
+        flash(failure(error, 'Could not add pages'))
       } finally {
         setBusy(false)
       }
@@ -87,7 +113,7 @@ export function useImport(
         })
       } catch (error) {
         console.error('Drop failed', error)
-        flash('Could not add files')
+        flash(failure(error, 'Could not add files'))
       } finally {
         setBusy(false)
       }
@@ -95,5 +121,36 @@ export function useImport(
     [addFiles, insertPagesIntoDoc, spliceDocsAfter, flash, setBusy, docsRef]
   )
 
-  return { addFiles, openViaDialog, addPagesToDoc, handleExternalDropFiles }
+  // Swap a document's pages for another file, keeping its place and name.
+  const replaceDoc = useCallback(
+    async (docId: string) => {
+      const [file] = await window.api.openFiles()
+      if (!file) return
+      setBusy(true)
+      try {
+        const pages = await loadIncomingPages([file])
+        replaceDocPages(docId, pages)
+      } catch (error) {
+        console.error('Replace failed', error)
+        flash(failure(error, `Could not open ${file.name}`))
+      } finally {
+        setBusy(false)
+      }
+    },
+    [replaceDocPages, flash, setBusy]
+  )
+
+  return {
+    addFiles,
+    openViaDialog,
+    addPagesToDoc,
+    handleExternalDropFiles,
+    replaceDoc,
+    pendingImports: pending
+  }
 }
+
+// The converter's own explanation (e.g. which program to install) when there
+// is one.
+const failure = (error: unknown, fallback: string): string =>
+  error instanceof ConvertError ? error.message : fallback

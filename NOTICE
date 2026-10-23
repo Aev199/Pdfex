@@ -1,0 +1,22 @@
+PDFx for Windows
+================
+
+This is a Windows-focused build of PDFx by Alex Gounis:
+
+    https://github.com/AlexandrosGounis/pdfx  (based on commit a8fc12d, v0.2.0+)
+
+PDFx, the .pdfx format and the original application are the work of Alex
+Gounis and the upstream contributors; their history is kept in this
+repository with authorship intact.
+
+Parts of the Windows features were ported from PDFx Plus for Windows by
+Uzair Mohammad (MIT), adapted to the current upstream code:
+
+    https://github.com/Umohammad/pdfx-plus-windows  (commit 55eb554)
+
+Ported or adapted from PDFx Plus: tab bar and workspace colours, context
+menu component, "Open with" / Explorer integration and drag-out, the
+document details ribbon, import placeholder rows, the export picker, the
+counter-scaled document titles and parts of the session storage design.
+
+All three are under the MIT License; see LICENSE.

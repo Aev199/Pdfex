@@ -1,11 +1,14 @@
 const SOFT_HYPHEN = /­/g
 const WHITESPACE = /\s+/g
+// Russian text writes ё and е interchangeably; same length, so offsets hold.
+const YO = /ё/g
 
 export function normalizeText(input: string): string {
   return input
     .normalize('NFKC')
     .replace(SOFT_HYPHEN, '')
     .toLowerCase()
+    .replace(YO, 'е')
     .replace(WHITESPACE, ' ')
     .trim()
 }

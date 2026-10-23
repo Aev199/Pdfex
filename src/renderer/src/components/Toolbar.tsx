@@ -2,12 +2,13 @@ import { isWeb } from '../platform/web/install'
 import { useGitHubStars } from '../app/useGitHubStars'
 import { FeatureHeaderActions } from '../features/HeaderActions'
 import { BoltIcon, GitHubIcon } from './icons'
+import { useZoomValue, type ZoomStore } from '../app/zoom-store'
 
 interface ToolbarProps {
   documentCount: number
   pageCount: number
   busy: boolean
-  zoom: number
+  zoomStore: ZoomStore
   aiOpen: boolean
   aiEnabled: boolean
   onZoomIn: () => void
@@ -25,7 +26,7 @@ export function Toolbar({
   documentCount,
   pageCount,
   busy,
-  zoom,
+  zoomStore,
   aiOpen,
   aiEnabled,
   onZoomIn,
@@ -66,7 +67,7 @@ export function Toolbar({
             </svg>
           </button>
           <button className="zoom-value" title="Reset zoom" onClick={onZoomReset}>
-            {Math.round(zoom * 100)}%
+            <ZoomPercent store={zoomStore} />%
           </button>
           <button className="icon-btn" title="Zoom in" onClick={onZoomIn}>
             <svg
@@ -115,4 +116,8 @@ export function Toolbar({
       )}
     </header>
   )
+}
+
+function ZoomPercent({ store }: { store: ZoomStore }): React.JSX.Element {
+  return <>{Math.round(useZoomValue(store) * 100)}</>
 }

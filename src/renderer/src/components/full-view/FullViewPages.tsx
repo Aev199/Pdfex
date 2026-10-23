@@ -7,6 +7,7 @@ import type { TextSpan } from '../../elements/text-marks'
 import { FullViewPage } from './FullViewPage'
 import { useFullViewDrag } from './use-full-view-drag'
 import { useCloseGuard } from './use-close-guard'
+import type { AnnotateHandlers } from './annotate'
 
 const NO_VALUES: FormValues = {}
 
@@ -54,6 +55,8 @@ interface FullViewPagesProps {
     pageWidth: number,
     pageHeight: number
   ) => void
+  annotate: AnnotateHandlers
+  onSourcePage: (pageId: string, sourceIndex: number) => void
   setView: React.Dispatch<React.SetStateAction<View>>
   resetView: () => void
   applyZoom: (nextZoom: (z: number) => number, focal?: { x: number; y: number }) => void
@@ -118,6 +121,8 @@ export function FullViewPages(props: FullViewPagesProps): React.JSX.Element {
               onSelectElement={(id) => onSelectElement(p.id, id)}
               onMoveElement={(id, dx, dy) => onMoveElement(p.id, id, dx, dy)}
               onDraw={(points) => onDraw(p.id, points, p.width, p.height)}
+              annotate={props.annotate}
+              onSourcePage={(index) => props.onSourcePage(p.id, index)}
               onAddText={(text, origin) => onAddText(p.id, text, origin, p.width, p.height)}
               onMarkText={(id, span) => onMarkText(p.id, id, span)}
               onUpdateText={(id, text) => onUpdateText(p.id, id, text, p.width, p.height)}

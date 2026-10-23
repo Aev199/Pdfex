@@ -1,4 +1,4 @@
-import { app, nativeTheme, BrowserWindow } from 'electron'
+import { app, dialog, nativeTheme, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -8,14 +8,15 @@ import { createWindow, getMainWindow, getRendererReady, sendOpenPaths } from './
 import { buildMenu } from './menu'
 import { registerIpc } from './register-ipc'
 import { registerAssetProtocol, registerAssetSchemePrivileged } from './assets'
+import { configureDataLocation } from './portable'
+import { cleanupTempExports } from './open-with'
+import { applyOnQuit, initUpdater } from './updates/updater'
 
 app.setName('PDFx')
 
 registerAssetSchemePrivileged()
 
-if (process.env.PDFX_USER_DATA) {
-  app.setPath('userData', process.env.PDFX_USER_DATA)
-}
+const dataLocation = configureDataLocation()
 
 let pendingOpenPaths: string[] = []
 
@@ -32,19 +33,24 @@ const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
-  app.on('second-instance', (_event, argv) => {
+  app.on('second-instance', (_event, argv, workingDirectory) => {
     const mainWindow = getMainWindow()
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
     }
-    void sendOpenPaths(collectFileArgs(argv.slice(1)))
+    const paths = collectFileArgs(argv.slice(1), workingDirectory)
+    // Until the window has restored its session and listens, keep them for
+    // the renderer-ready handshake rather than sending into the void.
+    if (getRendererReady()) void sendOpenPaths(paths)
+    else pendingOpenPaths.push(...paths)
   })
 
   app.whenReady().then(() => {
     electronApp.setAppUserModelId('com.pdfx.app')
 
     registerAssetProtocol()
+    void cleanupTempExports()
 
     nativeTheme.themeSource = 'dark'
 
@@ -68,6 +74,16 @@ if (!gotLock) {
 
     buildMenu()
     createWindow()
+    void initUpdater(dataLocation.kind === 'portable')
+
+    if (dataLocation.kind === 'fallback') {
+      void dialog.showMessageBox({
+        type: 'warning',
+        title: 'PDFx',
+        message: 'The data folder next to the program is not writable.',
+        detail: `Settings and sessions are kept in ${dataLocation.path} instead.\n\nWanted: ${dataLocation.wanted}`
+      })
+    }
 
     if (process.platform !== 'darwin') {
       nativeTheme.on('updated', () => {
@@ -82,6 +98,11 @@ if (!gotLock) {
     })
   })
 }
+
+app.on('will-quit', () => {
+  applyOnQuit()
+  void cleanupTempExports()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

@@ -21,7 +21,10 @@ export function createZoomBehavior(refs: ZoomHandlerRefs): ZoomBehavior<HTMLDivE
     .constrain(reversibleConstrain)
     .filter((event) => {
       if (event.type === 'wheel') return false
-      if ((event as MouseEvent).button) return false
+      const button = (event as MouseEvent).button
+      // Middle button (wheel click) pans from anywhere, even on top of a page.
+      if (button === 1) return true
+      if (button) return false
       const target = event.target as Element | null
       return !target?.closest('.page, button, input, textarea, .doc-actions, .doc-header')
     })
@@ -38,8 +41,10 @@ export function createZoomBehavior(refs: ZoomHandlerRefs): ZoomBehavior<HTMLDivE
       const overlayEl = overlayRef.current
       if (overlayEl) {
         overlayEl.style.transform = `translate(${t.x}px, ${t.y}px) scale(${t.k})`
-        overlayEl.style.setProperty('--k', String(t.k))
       }
+      // On the viewport so controls in both layers (titles in the overlay,
+      // document action rails in the world) can counter-scale against zoom.
+      vp.style.setProperty('--k', String(t.k))
       const now = performance.now()
       if (now - lastTick.current >= 90) {
         lastTick.current = now

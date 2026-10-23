@@ -26,8 +26,10 @@
   --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.36);
 }
 
+/* The desktop app is always dark (main sets nativeTheme to dark and tags
+   <html class="theme-dark">); the light palette is for the web build. */
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not(.theme-dark) {
     --surface: #ffffff;
     --ink: #16161a;
     --ink-soft: #55555c;
@@ -263,7 +265,7 @@ a.btn {
 /* In light mode the white bezel all but vanishes, so lift the glass pills off the
    page with a soft, oversized shadow to give them depth. */
 @media (prefers-color-scheme: light) {
-  .btn.glass {
+  :root:not(.theme-dark) .btn.glass {
     box-shadow:
       0 10px 28px rgba(20, 20, 24, 0.16),
       0 2px 6px rgba(20, 20, 24, 0.08);
@@ -494,7 +496,7 @@ a.btn {
 
 .doc-row {
   width: 100%;
-  padding: 52px 16px 20px;
+  padding: 94px 16px 20px;
   background: var(--group-bg);
   border-radius: 24px;
 }
@@ -516,9 +518,12 @@ a.btn {
   display: flex;
   align-items: center;
   gap: 10px;
+  height: 38px;
   padding: 4px 6px;
   pointer-events: auto;
-  transform: scale(calc(1 / max(var(--k, 1), 1)));
+  /* Counter-scale against the canvas zoom both ways (up to 2x below 50%) so
+     titles stay readable and clickable on a zoomed-out workspace. */
+  transform: scale(calc(1 / max(var(--k, 1), 0.5)));
   transform-origin: bottom left;
   white-space: nowrap;
 }
@@ -567,8 +572,8 @@ a.btn {
    index and page-count labels barely register. Lift them to --ink-soft so the
    header reads clearly. */
 @media (prefers-color-scheme: light) {
-  .doc-index,
-  .doc-pages {
+  :root:not(.theme-dark) .doc-index,
+  :root:not(.theme-dark) .doc-pages {
     color: var(--ink-soft);
   }
 }

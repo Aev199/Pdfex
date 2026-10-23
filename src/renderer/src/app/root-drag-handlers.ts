@@ -7,6 +7,10 @@ import type { IncomingFile, PageRef } from './types'
 const PAGE_MIME = 'application/x-pdfx-page'
 const FILES_TYPE = 'Files'
 
+// Holding Ctrl (Alt on macOS, as in Finder) while dropping a page copies it.
+const isCopyDrag = (event: React.DragEvent): boolean =>
+  window.api?.platform === 'darwin' ? event.altKey : event.ctrlKey
+
 export interface RootDragDeps {
   layout: CanvasLayout
   canvasRef: React.RefObject<CanvasHandle | null>
@@ -24,6 +28,9 @@ export interface RootDragDeps {
   updateDropTarget: (next: DropTarget | null) => void
   movePageInto: (source: PageRef, targetDocId: string, index: number) => void
   movePageToNewDoc: (source: PageRef, docIndex: number) => void
+  copyPageInto: (source: PageRef, targetDocId: string, index: number) => void
+  copyPageToNewDoc: (source: PageRef, docIndex: number) => void
+  setCopying: (copying: boolean) => void
   onExternalDrop: (files: IncomingFile[], target: DropTarget | null) => void
 }
 
@@ -50,13 +57,15 @@ export function createRootDragHandlers(deps: RootDragDeps): RootDragHandlers {
     const internal = event.dataTransfer.types.includes(PAGE_MIME)
     if (!internal && !event.dataTransfer.types.includes(FILES_TYPE)) return
     event.preventDefault()
-    event.dataTransfer.dropEffect = internal ? 'move' : 'copy'
-    if (!internal) deps.armDragWatchdog()
+    const copy = internal && isCopyDrag(event)
+    event.dataTransfer.dropEffect = internal && !copy ? 'move' : 'copy'
+    if (internal) deps.setCopying(copy)
+    else deps.armDragWatchdog()
     const w = deps.canvasRef.current?.clientToWorld(event.clientX, event.clientY)
     if (!w) return
     deps.updateDropTarget(
       internal
-        ? computeDropTarget(deps.layout, w.x, w.y, w.k, deps.collapsedId, true)
+        ? computeDropTarget(deps.layout, w.x, w.y, w.k, copy ? null : deps.collapsedId, true)
         : computeDropTarget(deps.layout, w.x, w.y, w.k, null, deps.externalCount <= 1)
     )
   }
@@ -75,11 +84,15 @@ export function createRootDragHandlers(deps: RootDragDeps): RootDragHandlers {
     const internal = event.dataTransfer.types.includes(PAGE_MIME)
     if (internal && deps.draggingPage) {
       const source = deps.draggingPage
+      const copy = isCopyDrag(event)
       const target = w
-        ? computeDropTarget(deps.layout, w.x, w.y, w.k, source.pageId, true)
+        ? computeDropTarget(deps.layout, w.x, w.y, w.k, copy ? null : source.pageId, true)
         : deps.dropTarget
       deps.clearDrag()
-      if (target?.kind === 'into') deps.movePageInto(source, target.docId, target.index)
+      if (copy) {
+        if (target?.kind === 'into') deps.copyPageInto(source, target.docId, target.index)
+        else if (target?.kind === 'between') deps.copyPageToNewDoc(source, target.docIndex)
+      } else if (target?.kind === 'into') deps.movePageInto(source, target.docId, target.index)
       else if (target?.kind === 'between') deps.movePageToNewDoc(source, target.docIndex)
       return
     }

@@ -1,26 +1,38 @@
-import { basename, join } from 'path'
+import { basename, join, resolve } from 'path'
 import { existsSync } from 'fs'
 import { readFile, readdir, stat } from 'fs/promises'
+import { grantReadPath } from './source-files'
 
 export interface OpenedFile {
   name: string
   data: Uint8Array
   path?: string
+  // Size and modification time when read, so a later re-read can tell
+  // whether the file changed on disk in the meantime.
+  size?: number
+  mtimeMs?: number
 }
 
-export const IMPORTABLE = /\.(pdf|pdfx|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
+export const IMPORTABLE =
+  /\.(pdf|pdfx|pdfxs|docx?|docm|dotx?|dotm|odt|xlsx?|xlsm|xlsb|xltx?|xltm|ods|pptx?|pptm|ppsx?|potx?|odp|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
 
-export function collectFileArgs(argv: string[]): string[] {
-  return argv.filter((arg) => /\.(pdf|pdfx)$/i.test(arg) && existsSync(arg))
+// Documents named on a command line (or dropped on pdfx.exe), made absolute against the directory that
+// command ran in (a second launch's cwd differs from ours).
+export function collectFileArgs(argv: string[], cwd = process.cwd()): string[] {
+  return argv
+    .filter((arg) => importable(arg))
+    .map((arg) => resolve(cwd, arg))
+    .filter((path) => existsSync(path))
 }
 
 export async function readFiles(paths: string[]): Promise<OpenedFile[]> {
   return Promise.all(
-    paths.map(async (p) => ({
-      name: basename(p),
-      data: new Uint8Array(await readFile(p)),
-      path: p
-    }))
+    paths.map(async (p) => {
+      const info = await stat(p)
+      const data = new Uint8Array(await readFile(p))
+      grantReadPath(p)
+      return { name: basename(p), data, path: p, size: info.size, mtimeMs: info.mtimeMs }
+    })
   )
 }
 

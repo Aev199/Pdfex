@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createSearchEngine, type OcrStatus, type SearchEngine, type SearchResult } from './engine'
 import { normalizeText } from './normalize'
 import { DEFAULT_OCR_LANGUAGE } from '../ocr/languages'
+import { getSettings } from '../app/settings-store'
 import type { OcrWord } from '../ocr/types'
 import type { ElementMap } from '../elements/types'
 import type { DocEntry } from '../types'
@@ -17,13 +18,14 @@ export interface SearchIndex {
   setOcrLanguage: (lang: string) => void
   getOcrWords: (sourceKey: string) => OcrWord[] | undefined
   ocrStatus: (sourceKey: string) => OcrStatus
+  activateOcr: () => void
 }
 
 export function useSearchIndex(docs: DocEntry[], elements: ElementMap): SearchIndex {
   const [version, setVersion] = useState(0)
   const [ocrRemaining, setOcrRemaining] = useState(0)
   const [hasScanned, setHasScanned] = useState(false)
-  const [ocrLanguage, setOcrLanguageState] = useState(DEFAULT_OCR_LANGUAGE)
+  const [ocrLanguage, setOcrLanguageState] = useState(() => getSettings().ocrLanguage || DEFAULT_OCR_LANGUAGE)
 
   const docsRef = useRef(docs)
   docsRef.current = docs
@@ -38,6 +40,7 @@ export function useSearchIndex(docs: DocEntry[], elements: ElementMap): SearchIn
       },
       getDocs: () => docsRef.current
     })
+    engineRef.current.setLanguage(ocrLanguage)
   }
   const engine = engineRef.current
 
@@ -67,6 +70,7 @@ export function useSearchIndex(docs: DocEntry[], elements: ElementMap): SearchIn
   const search = useCallback((query: string) => engine.search(query), [engine])
   const getOcrWords = useCallback((sourceKey: string) => engine.getOcrWords(sourceKey), [engine])
   const ocrStatus = useCallback((sourceKey: string) => engine.ocrStatus(sourceKey), [engine])
+  const activateOcr = useCallback(() => engine.activateOcr(), [engine])
 
   const setOcrLanguage = useCallback(
     (lang: string) => {
@@ -84,6 +88,7 @@ export function useSearchIndex(docs: DocEntry[], elements: ElementMap): SearchIn
     ocrLanguage,
     setOcrLanguage,
     getOcrWords,
-    ocrStatus
+    ocrStatus,
+    activateOcr
   }
 }

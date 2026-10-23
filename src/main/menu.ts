@@ -26,6 +26,17 @@ export function buildMenu(): void {
         { id: 'export-pdf', label: 'Export Single PDF…', click: sendMenu('export-pdf') },
         { id: 'export-zip', label: 'Export All as ZIP…', click: sendMenu('export-zip') },
         { type: 'separator' },
+        { label: 'Print…', accelerator: 'CommandOrControl+P', click: sendMenu('print') },
+        { type: 'separator' },
+        {
+          label: 'Save Session As…',
+          accelerator: 'CommandOrControl+Shift+S',
+          click: sendMenu('save-session')
+        },
+        { label: 'Save Tab As…', click: sendMenu('save-tab') },
+        { type: 'separator' },
+        { label: 'Settings…', accelerator: 'CommandOrControl+,', click: sendMenu('settings') },
+        { type: 'separator' },
         process.platform === 'darwin' ? { role: 'close' as const } : { role: 'quit' as const }
       ]
     },
@@ -59,7 +70,37 @@ export function buildMenu(): void {
         }
       ]
     },
-    { role: 'windowMenu' }
+    {
+      label: 'Tabs',
+      submenu: [
+        { label: 'New Tab', accelerator: 'CommandOrControl+T', click: sendMenu('new-tab') },
+        { label: 'Close Tab', accelerator: 'CommandOrControl+W', click: sendMenu('close-tab') },
+        { type: 'separator' },
+        { label: 'Next Tab', accelerator: 'Control+Tab', click: sendMenu('next-tab') },
+        {
+          label: 'Previous Tab',
+          accelerator: 'Control+Shift+Tab',
+          click: sendMenu('previous-tab')
+        }
+      ]
+    },
+    {
+      role: 'window',
+      submenu: [
+        { role: 'minimize' },
+        ...(process.platform === 'darwin' ? [{ role: 'zoom' as const }] : [])
+      ]
+    },
+    {
+      role: 'help',
+      submenu: [
+        { label: 'PDFx Help', accelerator: 'F1', click: sendMenu('help') },
+        { label: 'Keyboard Shortcuts', click: sendMenu('shortcuts') },
+        { type: 'separator' },
+        { label: 'Check for Updates…', click: sendMenu('check-updates') },
+        { label: 'About PDFx', click: sendMenu('about') }
+      ]
+    }
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }

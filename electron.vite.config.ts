@@ -10,7 +10,9 @@ export default defineConfig(({ command }) => ({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/main/index.ts')
-        }
+        },
+        // Electron's fs without asar support (the updater writes app.asar).
+        external: ['original-fs']
       }
     }
   },

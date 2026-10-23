@@ -5,8 +5,8 @@ import { rectsOverlap } from '../edit/selection'
 import { ACTIONS } from './undo'
 import type { MarkUndoEntry, UndoEntry } from './undo'
 
-export function useMarks(pushUndo: (entry: UndoEntry) => void) {
-  const [marks, setMarks] = useState<MarkMap>({})
+export function useMarks(pushUndo: (entry: UndoEntry) => void, initial: MarkMap = {}) {
+  const [marks, setMarks] = useState<MarkMap>(initial)
   const marksRef = useRef(marks)
   marksRef.current = marks
 
@@ -75,10 +75,35 @@ export function useMarks(pushUndo: (entry: UndoEntry) => void) {
     setMarks({ ...map, [pageId]: remove ? kept : [...kept, ...entries] })
   }, [])
 
+  // Give duplicated pages (new id -> original id) the marks of their originals.
+  // `from` holds the originals' annotations when they come from elsewhere
+  // (pages pasted from another tab).
+  const copyToPages = useCallback((origins: Map<string, string>, from?: MarkMap) => {
+    const map = marksRef.current
+    let next: MarkMap | null = null
+    for (const [copyId, originId] of origins) {
+      const marks = (from ?? map)[originId]
+      if (!marks?.length) continue
+      next ??= { ...map }
+      next[copyId] = marks.map((m) => ({ ...m, id: crypto.randomUUID() }))
+    }
+    if (next) setMarks(next)
+  }, [])
+
   const applyUndo = useCallback((entry: MarkUndoEntry) => applyEntry(entry, 'undo'), [applyEntry])
   const applyRedo = useCallback((entry: MarkUndoEntry) => applyEntry(entry, 'redo'), [applyEntry])
 
-  return { marks, addMark, toggleMark, clearMarks, restoreMarks, applyUndo, applyRedo }
+  return {
+    marks,
+    marksRef,
+    copyToPages,
+    addMark,
+    toggleMark,
+    clearMarks,
+    restoreMarks,
+    applyUndo,
+    applyRedo
+  }
 }
 
 export type MarkState = ReturnType<typeof useMarks>

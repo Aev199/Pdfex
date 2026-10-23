@@ -2,7 +2,7 @@ import { copyFileSync, mkdirSync, readdirSync, rmSync, existsSync, statSync } fr
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 
-const OCR_LANGS = ['eng', 'deu', 'fra', 'spa']
+const OCR_LANGS = ['eng', 'rus', 'deu', 'fra', 'spa']
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const nm = join(root, 'node_modules')

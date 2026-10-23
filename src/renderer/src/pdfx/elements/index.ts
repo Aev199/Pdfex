@@ -1,6 +1,7 @@
 import type { PDFPage } from 'pdf-lib'
-import type { InkElement, PageElement } from '../../elements/types'
+import type { InkElement, PageElement, ShapeElement } from '../../elements/types'
 import { drawInkElements } from './ink'
+import { drawShapeElements } from './shapes'
 import { drawTextElement } from './text'
 import { fontForElement } from './fonts'
 import type { ElementFonts } from './fonts'
@@ -14,6 +15,10 @@ export function drawElements(
   drawInkElements(
     page,
     elements.filter((e): e is InkElement => e.kind === 'ink')
+  )
+  drawShapeElements(
+    page,
+    elements.filter((e): e is ShapeElement => e.kind === 'shape')
   )
   if (!fonts) return
   for (const element of elements) {

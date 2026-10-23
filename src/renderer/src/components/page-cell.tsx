@@ -12,6 +12,8 @@ import { MarkLayer } from './MarkLayer'
 import { ElementsLayer } from './elements/ElementsLayer'
 import { FormLayer } from './forms/FormLayer'
 import { buildPageDragImage } from './page-drag-image'
+import { PageRotor, naturalSize } from './PageRotor'
+import type { SelectModifiers } from '../app/useCollection'
 
 interface PageCellProps {
   docId: string
@@ -29,7 +31,8 @@ interface PageCellProps {
   elements: PageElement[] | undefined
   pagesDraggable: boolean
   visibleNumber: number
-  onSelectPage: (docId: string, pageId: string) => void
+  onSelectPage: (docId: string, pageId: string, modifiers?: SelectModifiers) => void
+  onPageContextMenu: (docId: string, pageId: string, x: number, y: number) => void
   onOpenPage: (docId: string, pageId: string) => void
   onPageDragStart: (docId: string, pageId: string) => void
   onPageDragEnd: () => void
@@ -52,12 +55,15 @@ function PageCellImpl({
   pagesDraggable,
   visibleNumber,
   onSelectPage,
+  onPageContextMenu,
   onOpenPage,
   onPageDragStart,
   onPageDragEnd
 }: PageCellProps): React.JSX.Element {
   const aiActive = useAiActivePages().has(page.id)
   const aiFlash = useAiFlashPages().has(page.id)
+  const natural = naturalSize(page)
+  const displayWidth = pageDisplayWidth(page.width, page.height)
   return (
     <div
       data-page-id={page.id}
@@ -77,16 +83,23 @@ function PageCellImpl({
               opacity: 0,
               pointerEvents: 'none'
             }
-          : {
-              width: pageDisplayWidth(page.width, page.height),
+          : ({
+              width: displayWidth,
               height: pageHeight,
-              visibility: hidden ? 'hidden' : undefined
-            }
+              visibility: hidden ? 'hidden' : undefined,
+              '--rotor-w': `${displayWidth}px`,
+              '--rotor-h': `${pageHeight}px`
+            } as React.CSSProperties)
       }
       draggable={pagesDraggable}
       onClick={(e) => {
         e.stopPropagation()
-        onSelectPage(docId, page.id)
+        onSelectPage(docId, page.id, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey })
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onPageContextMenu(docId, page.id, e.clientX, e.clientY)
       }}
       onDoubleClick={(e) => {
         e.stopPropagation()
@@ -94,7 +107,7 @@ function PageCellImpl({
       }}
       onDragStart={(e) => {
         e.dataTransfer.setData('application/x-pdfx-page', page.id)
-        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.effectAllowed = 'copyMove'
         const el = e.currentTarget as HTMLElement
         const rect = el.getBoundingClientRect()
         const img = buildPageDragImage(el, rect)
@@ -104,35 +117,37 @@ function PageCellImpl({
       }}
       onDragEnd={onPageDragEnd}
     >
-      <PageView
-        pdf={page.source.pdf}
-        pageNumber={page.pageIndex + 1}
-        naturalWidth={page.width}
-        naturalHeight={page.height}
-        version={renderVersion}
-        highlightQuery={highlightQuery}
-        ocrWords={ocrWords}
-      />
-      {hasAnyValue(formValues) && (
-        <FormLayer
+      <PageRotor rotation={page.rotation}>
+        <PageView
           pdf={page.source.pdf}
           pageNumber={page.pageIndex + 1}
-          naturalHeight={page.height}
-          values={formValues!}
-          readOnly
+          naturalWidth={natural.width}
+          naturalHeight={natural.height}
+          version={renderVersion}
+          highlightQuery={highlightQuery}
+          ocrWords={ocrWords}
         />
-      )}
-      {elements && elements.length > 0 && (
-        <ElementsLayer
-          elements={elements}
-          naturalWidth={page.width}
-          naturalHeight={page.height}
-          interactive={false}
-          selectedId={null}
-          onSelect={() => {}}
-        />
-      )}
-      {marks && marks.length > 0 && <MarkLayer marks={marks} />}
+        {hasAnyValue(formValues) && (
+          <FormLayer
+            pdf={page.source.pdf}
+            pageNumber={page.pageIndex + 1}
+            naturalHeight={natural.height}
+            values={formValues!}
+            readOnly
+          />
+        )}
+        {elements && elements.length > 0 && (
+          <ElementsLayer
+            elements={elements}
+            naturalWidth={natural.width}
+            naturalHeight={natural.height}
+            interactive={false}
+            selectedId={null}
+            onSelect={() => {}}
+          />
+        )}
+        {marks && marks.length > 0 && <MarkLayer marks={marks} />}
+      </PageRotor>
       {aiActive && <div className="ai-glow" />}
       {aiFlash && <div className="ai-flash" />}
       <span className="page-number">{visibleNumber}</span>

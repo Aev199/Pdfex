@@ -6,11 +6,15 @@ import type { PageRef } from '../../app/types'
 import type { MarkMap } from '../../edit/types'
 import type { FormValuesBySource } from '../../forms/types'
 import type { ElementMap } from '../../elements/types'
+import type { SelectModifiers } from '../../app/useCollection'
+
+const NO_PAGES: ReadonlySet<string> = new Set()
 
 interface DocLayerProps {
   items: DocPlacement[]
   renderVersion: number
-  selected: PageRef | null
+  selectedIds: ReadonlySet<string>
+  hoveredDocId: string | null
   pagesDraggable: boolean
   collapsedId: string | null
   draggingPage: PageRef | null
@@ -23,7 +27,10 @@ interface DocLayerProps {
   intoGhostWidth: number
   intoGhostHeight: number
   betweenIndex: number
-  onSelectPage: (docId: string, pageId: string) => void
+  onSelectPage: (docId: string, pageId: string, modifiers?: SelectModifiers) => void
+  onPageContextMenu: (docId: string, pageId: string, x: number, y: number) => void
+  onDocContextMenu: (docId: string, x: number, y: number) => void
+  onHoverDoc: (docId: string | null) => void
   onOpenPage: (docId: string, pageId: string) => void
   onPageDragStart: (docId: string, pageId: string) => void
   onPageDragEnd: () => void
@@ -40,7 +47,13 @@ function DocLayerImpl(props: DocLayerProps): React.JSX.Element {
         return (
           <div
             key={doc.id}
-            className="canvas-doc"
+            className={'canvas-doc' + (props.hoveredDocId === doc.id ? ' hovered' : '')}
+            onMouseEnter={() => props.onHoverDoc(doc.id)}
+            onMouseLeave={() => props.onHoverDoc(null)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              props.onDocContextMenu(doc.id, e.clientX, e.clientY)
+            }}
             style={{
               left: item.x,
               top: item.y,
@@ -52,7 +65,7 @@ function DocLayerImpl(props: DocLayerProps): React.JSX.Element {
               doc={doc}
               pageHeight={BASE_PAGE_HEIGHT}
               renderVersion={props.renderVersion}
-              selectedPageId={props.selected?.docId === doc.id ? props.selected.pageId : null}
+              selectedIds={doc.pages.some((p) => props.selectedIds.has(p.id)) ? props.selectedIds : NO_PAGES}
               pagesDraggable={props.pagesDraggable}
               collapseId={
                 props.collapsedId && props.draggingPage?.docId === doc.id ? props.collapsedId : null
@@ -71,6 +84,7 @@ function DocLayerImpl(props: DocLayerProps): React.JSX.Element {
                   : null
               }
               onSelectPage={props.onSelectPage}
+              onPageContextMenu={props.onPageContextMenu}
               onOpenPage={props.onOpenPage}
               onPageDragStart={props.onPageDragStart}
               onPageDragEnd={props.onPageDragEnd}
