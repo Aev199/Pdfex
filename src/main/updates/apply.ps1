@@ -24,6 +24,19 @@ param(
   [string]$Version
 )
 $ErrorActionPreference = 'Stop'
+# PDFx passes the parameters in apply.json next to this script, so no path
+# has to survive cmd.exe quoting.
+if (-not $AppDir) {
+  $p = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $PSScriptRoot 'apply.json') | ConvertFrom-Json
+  $AppDir = $p.AppDir
+  $InDir = $p.InDir
+  $OutDir = $p.OutDir
+  $KeepDir = $p.KeepDir
+  $WaitPid = [int]$p.WaitPid
+  $Relaunch = $p.Relaunch
+  $ResultFile = $p.ResultFile
+  $Version = $p.Version
+}
 $log = Join-Path (Split-Path -Parent $ResultFile) 'update.log'
 
 function Write-Log([string]$text) {

@@ -462,38 +462,43 @@ export function applyOnQuit(): void {
     const script = join(dir, 'apply.ps1')
     writeFileSync(script, `\uFEFF${applyScript}`)
     writeFileSync(handoffFile(), JSON.stringify({ version: args.Version, kind: phase.kind }))
-    const params = {
-      ...args,
-      AppDir: appDir(),
-      ResultFile: resultFile(),
-      Relaunch: relaunch ? '1' : '',
-      WaitPid: String(process.pid)
-    }
+    writeFileSync(
+      join(dir, 'apply.json'),
+      JSON.stringify({
+        ...args,
+        AppDir: appDir(),
+        ResultFile: resultFile(),
+        Relaunch: relaunch ? '1' : '',
+        WaitPid: process.pid
+      })
+    )
     const output = openSync(join(dir, 'powershell.log'), 'w')
+    // cmd.exe can't sit in a \\server\share folder: there the script goes by
+    // its full path instead.
+    const scriptArg = dir.startsWith('\\\\') ? `"${script}"` : 'apply.ps1'
+    // A detached child gets no console (DETACHED_PROCESS), and PowerShell
+    // without one exits before running anything. cmd.exe copes, and its
+    // `start` gives PowerShell a console of its own (minimised, then hidden).
+    // No paths on the command line: cwd is the updates folder and the
+    // parameters are in apply.json.
     const child = spawn(
-      'powershell.exe',
+      'cmd.exe',
       [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-WindowStyle',
-        'Hidden',
-        '-File',
-        script,
-        // Empty values are left out: -File may drop an empty argument and
-        // shift the next one into its place.
-        ...Object.entries(params)
-          .filter(([, value]) => value !== '')
-          .flatMap(([key, value]) => [`-${key}`, value])
+        '/d',
+        '/c',
+        `start "PDFx update" /min powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ${scriptArg}`
       ],
-      // PowerShell's own output and errors go to a file: whatever stops it
-      // before the script logs anything shows up there.
-      { detached: true, stdio: ['ignore', output, output], windowsHide: true, cwd: dir }
+      {
+        detached: true,
+        stdio: ['ignore', output, output],
+        windowsHide: true,
+        windowsVerbatimArguments: true,
+        cwd: dir
+      }
     )
     child.unref()
     log(
-      `PDFx ${stamp.version} closing; swap to ${args.Version} handed to PowerShell (pid ${child.pid ?? '?'})`
+      `PDFx ${stamp.version} closing; swap to ${args.Version} handed to PowerShell via cmd.exe (pid ${child.pid ?? '?'})`
     )
   } catch (error) {
     log(`could not start PowerShell: ${reason(error)}`)
