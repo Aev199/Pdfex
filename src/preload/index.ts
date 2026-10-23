@@ -62,6 +62,7 @@ export type MenuAction =
   | 'previous-tab'
   | 'save-session'
   | 'save-tab'
+  | 'print'
 
 export interface SaveFilter {
   name: string
@@ -105,6 +106,15 @@ const api = {
     return () => ipcRenderer.removeListener('pdfx:flush-session', listener)
   },
   sessionFlushed: (): void => ipcRenderer.send('pdfx:session-flushed'),
+  printSpool: (
+    id: string,
+    index: number,
+    jpeg: Uint8Array,
+    widthPt: number,
+    heightPt: number
+  ): Promise<void> => ipcRenderer.invoke('pdfx:print-spool', id, index, jpeg, widthPt, heightPt),
+  printRun: (id: string, title: string): Promise<boolean> =>
+    ipcRenderer.invoke('pdfx:print-run', id, title),
   listExternalApps: (): Promise<ExternalApp[]> => ipcRenderer.invoke('pdfx:list-external-apps'),
   openExternal: (action: OpenAction, source: OpenSource): Promise<void> =>
     ipcRenderer.invoke('pdfx:open-external', action, source),

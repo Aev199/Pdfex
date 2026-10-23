@@ -23,8 +23,12 @@ export interface PageEntry {
   id: string
   source: PdfSource
   pageIndex: number
+  // As displayed: swapped when `rotation` is 90 or 270.
   width: number
   height: number
+  // Extra clockwise turn chosen in PDFx (0, 90, 180, 270); the file keeps
+  // its own orientation until export.
+  rotation?: number
 }
 
 export interface DocEntry {

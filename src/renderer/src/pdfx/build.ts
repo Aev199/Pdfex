@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, degrees } from 'pdf-lib'
 import type { PDFPage } from 'pdf-lib'
 
 import { MANIFEST_NAME, PDFX_VERSION } from './format'
@@ -42,6 +42,7 @@ async function addExportPage(ctx: BuildContext, page: ExportPage): Promise<void>
   if (page.kind === 'raster') {
     const added = await addRasterPage(ctx.output, page)
     drawElements(added, page.elements, fonts)
+    turn(added, page.rotation)
     return
   }
   let source = ctx.sources.get(page.sourceKey)
@@ -53,6 +54,14 @@ async function addExportPage(ctx: BuildContext, page: ExportPage): Promise<void>
   ctx.output.addPage(copied)
   drawElements(copied, page.elements, fonts)
   drawMarks(copied, page.marks)
+  turn(copied, page.rotation)
+}
+
+// Marks and elements are drawn in the page's own orientation first, then the
+// whole page (with them) is turned, so they stay where they were drawn.
+function turn(page: PDFPage, extra: number | undefined): void {
+  if (!extra) return
+  page.setRotation(degrees((page.getRotation().angle + extra) % 360))
 }
 
 export async function buildPdf(pages: ExportPage[]): Promise<Uint8Array> {

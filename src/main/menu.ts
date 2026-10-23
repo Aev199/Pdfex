@@ -26,6 +26,8 @@ export function buildMenu(): void {
         { id: 'export-pdf', label: 'Export Single PDF…', click: sendMenu('export-pdf') },
         { id: 'export-zip', label: 'Export All as ZIP…', click: sendMenu('export-zip') },
         { type: 'separator' },
+        { label: 'Print…', accelerator: 'CommandOrControl+P', click: sendMenu('print') },
+        { type: 'separator' },
         {
           label: 'Save Session As…',
           accelerator: 'CommandOrControl+Shift+S',

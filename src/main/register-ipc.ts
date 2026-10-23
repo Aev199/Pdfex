@@ -8,6 +8,7 @@ import { clipboardFilePaths } from './clipboard'
 import { readResource } from './resource'
 import { fileInfo, readSource, statSource } from './source-files'
 import { listExternalApps, openExternal, resolveFile } from './open-with'
+import { runPrint, spoolPage } from './print'
 import type { OpenAction, OpenSource } from './open-with'
 import { loadAutosave, openSessionFile, saveSession, writeSessionFile } from './session'
 import type { SessionManifest } from './session'
@@ -78,6 +79,16 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
   )
 
   ipcMain.handle('pdfx:session-open-file', (_event, path: unknown) => openSessionFile(path))
+
+  ipcMain.handle(
+    'pdfx:print-spool',
+    (_event, id: string, index: number, jpeg: Uint8Array, widthPt: number, heightPt: number) =>
+      spoolPage(id, index, jpeg, widthPt, heightPt)
+  )
+
+  ipcMain.handle('pdfx:print-run', (_event, id: string, title: string) =>
+    runPrint(id, String(title ?? 'PDFx'))
+  )
 
   ipcMain.handle('pdfx:list-external-apps', () => listExternalApps())
 

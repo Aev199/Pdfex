@@ -14,6 +14,7 @@ export async function prepareExportPage(
 ): Promise<ExportPage> {
   const prepared = await preparePage(page, marks, filledBytes)
   prepared.elements = elements
+  prepared.rotation = page.rotation
   return prepared
 }
 

@@ -258,6 +258,49 @@ test('shapes drawn in the full view are exported as vector strokes', async () =>
   assert.ok(statSync(out).size > 0)
 })
 
+test('reader: thumbnails, page jump, rotation and printing', async () => {
+  const { app, page } = await launch(freshData(), [files.report])
+  try {
+    await rendered(page)
+    await app.evaluate(({ app: a }) => {
+      globalThis.__printed = null
+      a.on('web-contents-created', (_e, wc) => {
+        wc.print = (_opts, cb) => {
+          const fs = process.getBuiltinModule('fs')
+          const url = new URL(wc.getURL())
+          const file = decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, '$1')
+          const html = fs.readFileSync(file, 'utf8')
+          globalThis.__printed = (html.match(/class="sheet"/g) || []).length
+          cb(true)
+        }
+      })
+    })
+    await page.locator('.canvas-world .page[data-page-id]').nth(1).click({ button: 'right' })
+    await clickMenuItem(page, 'Rotate right')
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    if (!(await page.locator('.fv-sidebar').count())) await page.keyboard.press('F4')
+    assert.equal(await page.locator('.fv-thumb').count(), 12)
+    await page.locator('.fv-thumb').nth(1).click()
+    await page.waitForTimeout(1000)
+    assert.equal(await page.locator('.full-count-input').inputValue(), '2')
+    assert.ok(await page.locator('.full-actions .btn', { hasText: 'Edit' }).isDisabled())
+    await page.locator('.full-count-input').click()
+    await page.keyboard.type('9')
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(1000)
+    assert.equal(await page.locator('.full-count-input').inputValue(), '9')
+    await page.locator('.full-actions .btn', { hasText: 'Print' }).click()
+    await clickMenuItem(page, 'Print "')
+    for (let i = 0; i < 60 && !(await app.evaluate(() => globalThis.__printed)); i++) {
+      await page.waitForTimeout(500)
+    }
+    assert.equal(await app.evaluate(() => globalThis.__printed), 12)
+  } finally {
+    await app.close()
+  }
+})
+
 let failed = 0
 for (const { name, fn } of tests) {
   const t0 = Date.now()

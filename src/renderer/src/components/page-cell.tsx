@@ -12,6 +12,7 @@ import { MarkLayer } from './MarkLayer'
 import { ElementsLayer } from './elements/ElementsLayer'
 import { FormLayer } from './forms/FormLayer'
 import { buildPageDragImage } from './page-drag-image'
+import { PageRotor, naturalSize } from './PageRotor'
 import type { SelectModifiers } from '../app/useCollection'
 
 interface PageCellProps {
@@ -61,6 +62,8 @@ function PageCellImpl({
 }: PageCellProps): React.JSX.Element {
   const aiActive = useAiActivePages().has(page.id)
   const aiFlash = useAiFlashPages().has(page.id)
+  const natural = naturalSize(page)
+  const displayWidth = pageDisplayWidth(page.width, page.height)
   return (
     <div
       data-page-id={page.id}
@@ -80,11 +83,13 @@ function PageCellImpl({
               opacity: 0,
               pointerEvents: 'none'
             }
-          : {
-              width: pageDisplayWidth(page.width, page.height),
+          : ({
+              width: displayWidth,
               height: pageHeight,
-              visibility: hidden ? 'hidden' : undefined
-            }
+              visibility: hidden ? 'hidden' : undefined,
+              '--rotor-w': `${displayWidth}px`,
+              '--rotor-h': `${pageHeight}px`
+            } as React.CSSProperties)
       }
       draggable={pagesDraggable}
       onClick={(e) => {
@@ -112,35 +117,37 @@ function PageCellImpl({
       }}
       onDragEnd={onPageDragEnd}
     >
-      <PageView
-        pdf={page.source.pdf}
-        pageNumber={page.pageIndex + 1}
-        naturalWidth={page.width}
-        naturalHeight={page.height}
-        version={renderVersion}
-        highlightQuery={highlightQuery}
-        ocrWords={ocrWords}
-      />
-      {hasAnyValue(formValues) && (
-        <FormLayer
+      <PageRotor rotation={page.rotation}>
+        <PageView
           pdf={page.source.pdf}
           pageNumber={page.pageIndex + 1}
-          naturalHeight={page.height}
-          values={formValues!}
-          readOnly
+          naturalWidth={natural.width}
+          naturalHeight={natural.height}
+          version={renderVersion}
+          highlightQuery={highlightQuery}
+          ocrWords={ocrWords}
         />
-      )}
-      {elements && elements.length > 0 && (
-        <ElementsLayer
-          elements={elements}
-          naturalWidth={page.width}
-          naturalHeight={page.height}
-          interactive={false}
-          selectedId={null}
-          onSelect={() => {}}
-        />
-      )}
-      {marks && marks.length > 0 && <MarkLayer marks={marks} />}
+        {hasAnyValue(formValues) && (
+          <FormLayer
+            pdf={page.source.pdf}
+            pageNumber={page.pageIndex + 1}
+            naturalHeight={natural.height}
+            values={formValues!}
+            readOnly
+          />
+        )}
+        {elements && elements.length > 0 && (
+          <ElementsLayer
+            elements={elements}
+            naturalWidth={natural.width}
+            naturalHeight={natural.height}
+            interactive={false}
+            selectedId={null}
+            onSelect={() => {}}
+          />
+        )}
+        {marks && marks.length > 0 && <MarkLayer marks={marks} />}
+      </PageRotor>
       {aiActive && <div className="ai-glow" />}
       {aiFlash && <div className="ai-flash" />}
       <span className="page-number">{visibleNumber}</span>

@@ -16,6 +16,7 @@ export interface SessionPage {
   pageIndex: number
   width: number
   height: number
+  rotation?: number
 }
 
 export interface SessionDoc {
@@ -66,7 +67,8 @@ const docRecord = (doc: DocEntry): SessionDoc => ({
     source: p.source.id,
     pageIndex: p.pageIndex,
     width: p.width,
-    height: p.height
+    height: p.height,
+    rotation: p.rotation
   }))
 })
 
@@ -194,7 +196,8 @@ export async function restoreSession(loaded: LoadedSession): Promise<Restored> {
           source,
           pageIndex: page.pageIndex,
           width: page.width,
-          height: page.height
+          height: page.height,
+          rotation: page.rotation
         })
       }
       for (const [sourceId, lostPages] of lost) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DocEntry } from '../types'
 import type { MarkKind, MarkMap, MarkRect } from '../edit/types'
 import { isMarkTool } from '../edit/types'
@@ -17,6 +17,9 @@ import { useEditMode } from './full-view/edit/use-edit-mode'
 import { ToolCursor } from './full-view/edit/ToolCursor'
 import { FullViewChrome } from './full-view/FullViewChrome'
 import { FullViewPages } from './full-view/FullViewPages'
+import { FullViewSidebar } from './full-view/FullViewSidebar'
+import { useContextMenu } from '../app/context-menu'
+import type { PageEntry } from '../types'
 
 interface FullViewProps {
   docs: DocEntry[]
@@ -64,7 +67,17 @@ interface FullViewProps {
     pageHeight: number
   ) => void
   onActivePageChange: (pageId: string) => void
+  onPrint: (pages: PageEntry[], title: string) => void
   onClose: () => void
+}
+
+const SIDEBAR_KEY = 'pdfx.readerSidebar'
+const readSidebarPref = (): boolean => {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === '1'
+  } catch {
+    return false
+  }
 }
 
 export function FullView({
@@ -87,6 +100,7 @@ export function FullView({
   onToggleTextMark,
   onUpdateText,
   onActivePageChange,
+  onPrint,
   onClose
 }: FullViewProps): React.JSX.Element {
   const s = useFullViewState(docs, startDocId, startPageId, originRect)
@@ -176,6 +190,84 @@ export function FullView({
     [drawStyle, onAddInk, onAddShape, onRemoveElements]
   )
 
+  // Reader sidebar (pages / outline), remembered between openings.
+  const [sidebarOpen, setSidebarOpen] = useState(readSidebarPref)
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((open) => {
+      try {
+        localStorage.setItem(SIDEBAR_KEY, open ? '0' : '1')
+      } catch {
+        // Not remembered, still toggled.
+      }
+      return !open
+    })
+  }, [])
+  const { goTo } = controls
+  const { di, doc, pi, page } = s
+  const goToPage = useCallback((index: number) => goTo(di, index), [goTo, di])
+
+  // An internal link: the page of the same file, if this document has it.
+  const followLink = useCallback(
+    (pageId: string, sourceIndex: number) => {
+      const from = doc.pages.find((p) => p.id === pageId)
+      const target = doc.pages.findIndex(
+        (p) => p.source === from?.source && p.pageIndex === sourceIndex
+      )
+      if (target !== -1) goToPage(target)
+    },
+    [doc, goToPage]
+  )
+
+  const openMenu = useContextMenu()
+  const print = useCallback(() => {
+    openMenu(window.innerWidth - 260, 60, [
+      {
+        label: `Print "${doc.name}" (${doc.pages.length} pages)…`,
+        onClick: () => onPrint(doc.pages, doc.name)
+      },
+      { label: `Print page ${pi + 1}…`, onClick: () => onPrint([page], `${doc.name} p${pi + 1}`) }
+    ])
+  }, [openMenu, doc, pi, page, onPrint])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      )
+        return
+      if (event.key === 'F4') {
+        event.preventDefault()
+        toggleSidebar()
+      } else if (event.key === 'Home' && !edit.editing) {
+        event.preventDefault()
+        goToPage(0)
+      } else if (event.key === 'End' && !edit.editing) {
+        event.preventDefault()
+        goToPage(doc.pages.length - 1)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [toggleSidebar, goToPage, doc.pages.length, edit.editing])
+
+  useEffect(
+    () =>
+      window.api.onMenu((action) => {
+        if (action === 'print') print()
+      }),
+    [print]
+  )
+
+  // Drawing tools work in the page's own orientation; a page turned with
+  // Rotate is turned back before editing.
+  const editBlocked = page.rotation ? 'Turn this page back (Rotate) to edit it' : null
+  const { finishEdit, editing } = edit
+  useEffect(() => {
+    if (editing && page.rotation) finishEdit()
+  }, [editing, page.rotation, finishEdit])
+
   const animating = s.phase !== 'open'
   const chromeOpacity = s.revealed ? 1 : 0
 
@@ -214,6 +306,7 @@ export function FullView({
         onMoveElement={onMoveElement}
         onDraw={onAddInk}
         annotate={annotate}
+        onSourcePage={followLink}
         onAddText={onAddText}
         onMarkText={(pageId, elementId, span) => {
           if (isMarkTool(edit.tool)) onToggleTextMark(pageId, elementId, edit.tool, span)
@@ -241,7 +334,13 @@ export function FullView({
         onDrawStyle={edit.setDrawStyle}
         runClose={controls.runClose}
         navByKey={controls.navByKey}
+        goToPage={goToPage}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={toggleSidebar}
+        onPrint={print}
+        editBlocked={editBlocked}
       />
+      {sidebarOpen && !animating && <FullViewSidebar doc={doc} current={pi} onGo={goToPage} />}
       {edit.editing && isMarkTool(edit.tool) && <ToolCursor tool={edit.tool} />}
     </div>
   )

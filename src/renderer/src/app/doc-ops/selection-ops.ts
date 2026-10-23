@@ -141,6 +141,12 @@ export function pageRange(docs: DocEntry[], anchor: PageRef, target: PageRef): P
 export const allPages = (docs: DocEntry[]): PageRef[] =>
   docs.flatMap((d) => d.pages.map((p) => ({ docId: d.id, pageId: p.id })))
 
+const turned = (
+  size: { width: number; height: number },
+  rotation: number | undefined
+): { width: number; height: number } =>
+  rotation === 90 || rotation === 270 ? { width: size.height, height: size.width } : size
+
 // Point every page of `oldId` at `next` (a re-read of the same file after it
 // changed on disk). Page ids stay, so their annotations stay. Pages past the
 // new end disappear; a document that showed the whole old file in order
@@ -162,7 +168,7 @@ export function swapSource(
     for (const page of doc.pages) {
       if (page.source.id !== oldId) pages.push(page)
       else if (page.pageIndex < count)
-        pages.push({ ...page, source: next, ...sizes[page.pageIndex] })
+        pages.push({ ...page, source: next, ...turned(sizes[page.pageIndex], page.rotation) })
     }
     if (whole) {
       for (let i = doc.pages.length; i < count; i++) {
@@ -172,4 +178,27 @@ export function swapSource(
     return { ...doc, pages }
   })
   return result.filter((d) => d.pages.length > 0)
+}
+
+// Turn pages by ±90° (display size swaps with the turn).
+export function rotatePages(docs: DocEntry[], refs: PageRef[], delta: 90 | -90): DocEntry[] {
+  const ids = new Set(refs.map((r) => r.pageId))
+  if (ids.size === 0) return docs
+  return docs.map((doc) =>
+    doc.pages.some((p) => ids.has(p.id))
+      ? {
+          ...doc,
+          pages: doc.pages.map((p) =>
+            ids.has(p.id)
+              ? {
+                  ...p,
+                  rotation: ((((p.rotation ?? 0) + delta) % 360) + 360) % 360,
+                  width: p.height,
+                  height: p.width
+                }
+              : p
+          )
+        }
+      : doc
+  )
 }

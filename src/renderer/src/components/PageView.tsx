@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
-import { dpr, logRenderError, renderBase, renderDetail } from './page-view/raster'
+import { dpr, logRenderError, renderBase, renderDetail, visibleGeometry } from './page-view/raster'
 import { FULL_LEVELS, THUMB_LEVELS, nextLevel } from './page-view/raster-levels'
 import { enqueueRender } from './page-view/render-queue'
 import { track, viewing } from '../pdfx/pdf-activity'
@@ -168,19 +168,17 @@ function PageViewImpl({
       return
     }
 
-    const rect = root.getBoundingClientRect()
-    const layoutW = root.offsetWidth
-    const winW = window.innerWidth
-    const winH = window.innerHeight
-    const visLeft = Math.max(0, rect.left)
-    const visTop = Math.max(0, rect.top)
-    const visRight = Math.min(winW, rect.right)
-    const visBottom = Math.min(winH, rect.bottom)
-    const visW = visRight - visLeft
-    const visH = visBottom - visTop
-
+    const rotation = Number(
+      (root.closest('.page-rotor') as HTMLElement | null)?.dataset.rotation ?? 0
+    )
+    const geometry = visibleGeometry(
+      root.getBoundingClientRect(),
+      root.offsetWidth,
+      root.offsetHeight,
+      rotation
+    )
     const baseDevicePx = (levelRef.current / Math.max(naturalWidth, naturalHeight)) * naturalWidth
-    if (visW <= 0 || visH <= 0 || rect.width * dpr() <= baseDevicePx * 1.05) {
+    if (!geometry || root.offsetWidth * geometry.screenScale * dpr() <= baseDevicePx * 1.05) {
       detailCanvas.style.display = 'none'
       freeCanvas(detailCanvas)
       return
@@ -197,7 +195,7 @@ function PageViewImpl({
             pdf,
             pageNumber,
             naturalWidth,
-            geometry: { rect, layoutW, visLeft, visTop, visW, visH },
+            geometry,
             detailCanvas,
             isCancelled: () => cancelled,
             onTask: (t) => (task = t)

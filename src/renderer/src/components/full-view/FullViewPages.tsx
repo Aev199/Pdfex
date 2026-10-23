@@ -56,6 +56,7 @@ interface FullViewPagesProps {
     pageHeight: number
   ) => void
   annotate: AnnotateHandlers
+  onSourcePage: (pageId: string, sourceIndex: number) => void
   setView: React.Dispatch<React.SetStateAction<View>>
   resetView: () => void
   applyZoom: (nextZoom: (z: number) => number, focal?: { x: number; y: number }) => void
@@ -121,6 +122,7 @@ export function FullViewPages(props: FullViewPagesProps): React.JSX.Element {
               onMoveElement={(id, dx, dy) => onMoveElement(p.id, id, dx, dy)}
               onDraw={(points) => onDraw(p.id, points, p.width, p.height)}
               annotate={props.annotate}
+              onSourcePage={(index) => props.onSourcePage(p.id, index)}
               onAddText={(text, origin) => onAddText(p.id, text, origin, p.width, p.height)}
               onMarkText={(id, span) => onMarkText(p.id, id, span)}
               onUpdateText={(id, text) => onUpdateText(p.id, id, text, p.width, p.height)}

@@ -234,6 +234,22 @@ export function useCollection(
     [setDocs, setSelected]
   )
 
+  const rotateSelection = useCallback(
+    (delta: 90 | -90) => setDocs((prev) => selOps.rotatePages(prev, currentSelection(), delta)),
+    [setDocs, currentSelection]
+  )
+
+  const rotateDoc = useCallback(
+    (docId: string, delta: 90 | -90) =>
+      setDocs((prev) => {
+        const doc = prev.find((d) => d.id === docId)
+        return doc
+          ? selOps.rotatePages(prev, doc.pages.map((p) => ({ docId, pageId: p.id })), delta)
+          : prev
+      }),
+    [setDocs]
+  )
+
   const swapSource = useCallback(
     (oldId: string, next: PdfSource, sizes: { width: number; height: number }[]) => {
       setDocs((prev) => selOps.swapSource(prev, oldId, next, sizes))
@@ -386,6 +402,8 @@ export function useCollection(
     splitDocAt,
     replaceDocPages,
     swapSource,
+    rotateSelection,
+    rotateDoc,
     copySelected,
     pasteAfterSelected,
     insertPagesAfter,

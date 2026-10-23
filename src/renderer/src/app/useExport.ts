@@ -47,6 +47,7 @@ export function useExport(
   // be lost by handing over the original file instead of an export).
   const hasEdits = useCallback(
     (page: PageEntry): boolean =>
+      !!page.rotation ||
       !!marks[page.id]?.length ||
       !!elements[page.id]?.length ||
       Object.keys(formValues[page.source.id] ?? {}).length > 0,

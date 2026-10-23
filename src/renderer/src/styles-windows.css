@@ -722,3 +722,210 @@
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
+
+/* Pages turned with Rotate: content laid out unturned, then rotated. */
+.page-rotor {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform-origin: center;
+}
+
+/* Reader: copyable text and clickable links on the open page. */
+.copy-text-layer {
+  cursor: default;
+}
+
+.copy-text-layer > * {
+  cursor: text;
+}
+
+.copy-text-layer ::selection {
+  background: rgba(68, 131, 247, 0.35);
+}
+
+.link-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.pdf-link {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.pdf-link:hover {
+  background: rgba(68, 131, 247, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(68, 131, 247, 0.45);
+}
+
+/* Only the text itself takes the pointer: fields and marks stay clickable. */
+.find-layer.copy-text-layer {
+  pointer-events: none;
+}
+
+.copy-text-layer span {
+  pointer-events: auto;
+}
+
+/* Reader sidebar: thumbnails or outline of the open document. */
+.fv-sidebar {
+  position: absolute;
+  left: 0;
+  top: var(--toolbar-h);
+  bottom: 0;
+  z-index: 11;
+  width: 196px;
+  display: flex;
+  flex-direction: column;
+  background: var(--overlay-strong);
+  box-shadow:
+    inset -1px 0 0 var(--hairline),
+    8px 0 24px rgba(0, 0, 0, 0.25);
+}
+
+.fv-sidebar-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  flex: none;
+}
+
+.fv-sidebar-tabs button {
+  flex: 1;
+  padding: 5px 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.fv-sidebar-tabs button.on {
+  background: var(--control);
+  color: var(--ink);
+}
+
+.fv-sidebar-tabs button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.fv-sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 10px 16px;
+  scrollbar-width: thin;
+}
+
+.fv-thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 6px;
+  margin-bottom: 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.fv-thumb:hover {
+  background: var(--hover);
+}
+
+.fv-thumb.on {
+  background: var(--control);
+  color: var(--ink);
+}
+
+.fv-thumb-page {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-height: 200px;
+  background: #fff;
+  box-shadow: var(--page-shadow);
+}
+
+.fv-thumb.on .fv-thumb-page {
+  outline: 2px solid var(--select);
+  outline-offset: 2px;
+}
+
+.fv-outline,
+.fv-outline .fv-outline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fv-outline .fv-outline {
+  padding-left: 12px;
+}
+
+.fv-outline-item {
+  display: block;
+  width: 100%;
+  padding: 5px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.fv-outline-item:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.fv-outline-item:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+/* "12 / 340": the number is editable. */
+.full-chrome .full-count {
+  pointer-events: auto;
+}
+
+.full-count-input {
+  width: auto;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: right;
+  outline: none;
+}
+
+.full-count-input:focus {
+  background: var(--hover);
+  border-radius: 4px;
+}
+
+/* Readable over a white page too. */
+.full-chrome .full-count {
+  background: var(--overlay-strong);
+  color: var(--ink-soft);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline),
+    0 4px 14px rgba(0, 0, 0, 0.3);
+}

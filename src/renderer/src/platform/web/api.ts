@@ -18,6 +18,11 @@ export function createWebApi(): PdfxApi {
     getPathForFile: () => '',
     expandDropPaths: async () => [],
     readSource: async () => null,
+    printSpool: async () => {},
+    printRun: async () => {
+      window.print()
+      return true
+    },
     sessionLoad: async () => null,
     sessionSave: async () => {},
     sessionWriteFile: async () => {},

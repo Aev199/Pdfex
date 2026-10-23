@@ -34,6 +34,7 @@ import { ExportPicker } from './components/ExportPicker'
 import { StatusRibbon } from './components/StatusRibbon'
 import { useDocInfo } from './app/useDocInfo'
 import { useOpenWith } from './app/useOpenWith'
+import { usePrint } from './app/usePrint'
 import { useContextMenu } from './app/context-menu'
 import { useSourceWatch } from './app/useSourceWatch'
 import { NoticeBar } from './components/NoticeBar'
@@ -284,6 +285,7 @@ export function WorkspaceView({
     [docs, pendingImports.length]
   )
   const openWith = useOpenWith(collection.docsRef, buildPagesPdf, hasEdits, setBusy, flash)
+  const printPages = usePrint(buildPagesPdf, setBusy, flash)
   const { handlePaste } = usePaste(collection, addFiles, setBusy, flash)
 
   const drag = useDragController({
@@ -382,8 +384,18 @@ export function WorkspaceView({
     extractSelection,
     deleteSelection,
     splitDocAt,
-    removeDoc
+    removeDoc,
+    rotateSelection,
+    rotateDoc
   } = collection
+
+  const printDoc = useCallback(
+    (docId: string) => {
+      const doc = docsRef.current.find((d) => d.id === docId)
+      if (doc) void printPages(doc.pages, doc.name)
+    },
+    [docsRef, printPages]
+  )
   const { openWithSubmenu, revealItem, startDocDragOut } = openWith
 
   const exportSelection = useCallback(() => {
@@ -417,6 +429,8 @@ export function WorkspaceView({
       if (count > 1) {
         openMenu(x, y, [
           { label: `Duplicate ${count} pages`, onClick: duplicateSelection },
+          { label: 'Rotate right', onClick: () => rotateSelection(90) },
+          { label: 'Rotate left', onClick: () => rotateSelection(-90) },
           { label: `Extract ${count} pages to a new document`, onClick: extractSelection },
           { label: `Export ${count} pages as PDF…`, onClick: exportSelection },
           { separator: true },
@@ -428,6 +442,8 @@ export function WorkspaceView({
         { label: 'Open', onClick: () => fullViewState.openPage(docId, pageId) },
         { separator: true },
         { label: 'Duplicate page', onClick: duplicateSelection },
+        { label: 'Rotate right', onClick: () => rotateSelection(90) },
+        { label: 'Rotate left', onClick: () => rotateSelection(-90) },
         { label: 'Copy page', onClick: copySelected },
         { label: 'Split document here', onClick: () => splitDocAt(docId, pageId) },
         { label: 'Extract to a new document', onClick: extractSelection },
@@ -459,6 +475,9 @@ export function WorkspaceView({
     (docId: string, x: number, y: number) => {
       openMenu(x, y, [
         { label: 'Duplicate document', onClick: () => duplicateDoc(docId) },
+        { label: 'Rotate document right', onClick: () => rotateDoc(docId, 90) },
+        { label: 'Rotate document left', onClick: () => rotateDoc(docId, -90) },
+        { label: 'Print document…', onClick: () => printDoc(docId) },
         { label: 'Replace with another file…', onClick: () => void replaceDoc(docId) },
         { label: 'Export document as PDF…', onClick: () => void exportCollection('pdf', [docId]) },
         { separator: true },
@@ -520,8 +539,24 @@ export function WorkspaceView({
       else if (action === 'export-pdfx') void exportCollection('pdfx')
       else if (action === 'export-pdf') void exportCollection('pdf')
       else if (action === 'export-zip') void exportZip()
+      else if (action === 'print' && !fullViewRef.current) {
+        // The document of the selected page, or the only one.
+        const all = docsRef.current
+        const docId = collection.selectedRef.current?.docId ?? (all.length === 1 ? all[0].id : null)
+        if (docId) printDoc(docId)
+        else flash('Select a page of the document to print')
+      }
     })
-  }, [openViaDialog, exportCollection, exportZip])
+  }, [
+    openViaDialog,
+    exportCollection,
+    exportZip,
+    printDoc,
+    docsRef,
+    collection.selectedRef,
+    flash,
+    fullViewRef
+  ])
 
   const totalPages = docs.reduce((sum, d) => sum + d.pages.length, 0)
   const { fullView } = fullViewState
@@ -629,6 +664,7 @@ export function WorkspaceView({
               onToggleTextMark={elementState.toggleTextMark}
               onUpdateText={elementState.updateText}
               onActivePageChange={fullViewState.setHiddenPageId}
+              onPrint={(pages, title) => void printPages(pages, title)}
               onClose={fullViewState.closeFullView}
             />
           )}

@@ -28,16 +28,14 @@ function dragRect(container: HTMLElement, start: Point, end: Point): MarkRect | 
   return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
 }
 
-export function SelectableTextLayer({
-  pdf,
-  pageNumber,
-  naturalHeight,
-  tool,
-  onSelect
-}: SelectableTextLayerProps): React.JSX.Element {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const dragStartRef = useRef<Point | null>(null)
-
+// pdf.js text spans laid over the page (sized to it, rebuilt on resize) so
+// the browser can select real text.
+export function useTextLayer(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  pdf: PDFDocumentProxy,
+  pageNumber: number,
+  naturalHeight: number
+): void {
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -76,6 +74,19 @@ export function SelectableTextLayer({
       container.replaceChildren()
     }
   }, [pdf, pageNumber, naturalHeight])
+}
+
+export function SelectableTextLayer({
+  pdf,
+  pageNumber,
+  naturalHeight,
+  tool,
+  onSelect
+}: SelectableTextLayerProps): React.JSX.Element {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const dragStartRef = useRef<Point | null>(null)
+
+  useTextLayer(containerRef, pdf, pageNumber, naturalHeight)
 
   useEffect(() => {
     const onDown = (event: PointerEvent): void => {
