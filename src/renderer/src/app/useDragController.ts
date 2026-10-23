@@ -25,6 +25,8 @@ export function useDragController(deps: DragControllerDeps) {
   const [committing, setCommitting] = useState(false)
   // A copy drag leaves the dragged page in place instead of collapsing it.
   const [copying, setCopying] = useState(false)
+  // Over the page's own place: the page stays put, nothing makes room.
+  const [home, setHome] = useState(true)
   const dragDepth = useRef(0)
   const dragWatchdog = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -54,6 +56,7 @@ export function useDragController(deps: DragControllerDeps) {
     setExternalCount(0)
     setCollapsedId(null)
     setCopying(false)
+    setHome(true)
   }, [])
 
   const armDragWatchdog = useCallback(() => {
@@ -92,7 +95,7 @@ export function useDragController(deps: DragControllerDeps) {
     dragKind,
     draggingPage,
     dropTarget,
-    collapsedId: copying ? null : collapsedId,
+    collapsedId: copying || home ? null : collapsedId,
     externalCount,
     dragDepth,
     setDragKind,
@@ -106,14 +109,17 @@ export function useDragController(deps: DragControllerDeps) {
     copyPageInto: deps.copyPageInto,
     copyPageToNewDoc: deps.copyPageToNewDoc,
     setCopying,
+    setHome,
     onExternalDrop: deps.onExternalDrop
   })
 
   return {
     dragKind,
     draggingPage,
-    dropTarget,
-    collapsedId: copying ? null : collapsedId,
+    dropTarget: dragKind === 'internal' && home ? null : dropTarget,
+    collapsedId: copying || home ? null : collapsedId,
+    // The lifted page while it still stands in its place.
+    liftedId: dragKind === 'internal' && (home || copying) ? (draggingPage?.pageId ?? null) : null,
     externalCount,
     committing,
     startPageDrag,

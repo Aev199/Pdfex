@@ -1,4 +1,4 @@
-import { computeDropTarget } from '../canvas/layout'
+import { computeDropTarget, isOwnPlace, overOwnPage } from '../canvas/layout'
 import { countDroppableItems, isDroppableFile } from './drop-items'
 import type { CanvasLayout, DropTarget } from '../canvas/layout'
 import type { CanvasHandle } from '../components/Canvas'
@@ -31,6 +31,8 @@ export interface RootDragDeps {
   copyPageInto: (source: PageRef, targetDocId: string, index: number) => void
   copyPageToNewDoc: (source: PageRef, docIndex: number) => void
   setCopying: (copying: boolean) => void
+  // The pointer is over the page's own place: nothing moves yet.
+  setHome: (home: boolean) => void
   onExternalDrop: (files: IncomingFile[], target: DropTarget | null) => void
 }
 
@@ -63,11 +65,34 @@ export function createRootDragHandlers(deps: RootDragDeps): RootDragHandlers {
     else deps.armDragWatchdog()
     const w = deps.canvasRef.current?.clientToWorld(event.clientX, event.clientY)
     if (!w) return
-    deps.updateDropTarget(
-      internal
-        ? computeDropTarget(deps.layout, w.x, w.y, w.k, copy ? null : deps.collapsedId, true)
-        : computeDropTarget(deps.layout, w.x, w.y, w.k, null, deps.externalCount <= 1)
+    if (!internal) {
+      deps.updateDropTarget(
+        computeDropTarget(deps.layout, w.x, w.y, w.k, null, deps.externalCount <= 1)
+      )
+      return
+    }
+    const source = deps.draggingPage
+    const target = internalTarget(w, copy)
+    deps.setHome(!!source && isHome(w, target, copy))
+    deps.updateDropTarget(target)
+  }
+
+  // Geometry as on screen: without the lifted page when moving.
+  const internalTarget = (w: { x: number; y: number; k: number }, copy: boolean): DropTarget =>
+    computeDropTarget(
+      deps.layout,
+      w.x,
+      w.y,
+      w.k,
+      copy ? null : (deps.draggingPage?.pageId ?? null),
+      true
     )
+
+  const isHome = (w: { x: number; y: number }, target: DropTarget, copy: boolean): boolean => {
+    const source = deps.draggingPage
+    if (!source) return false
+    if (overOwnPage(deps.layout, w.x, w.y, source.docId, source.pageId)) return true
+    return !copy && isOwnPlace(deps.layout, target, source.docId, source.pageId)
   }
 
   const onDragLeave = (event: React.DragEvent): void => {
@@ -85,10 +110,10 @@ export function createRootDragHandlers(deps: RootDragDeps): RootDragHandlers {
     if (internal && deps.draggingPage) {
       const source = deps.draggingPage
       const copy = isCopyDrag(event)
-      const target = w
-        ? computeDropTarget(deps.layout, w.x, w.y, w.k, copy ? null : source.pageId, true)
-        : deps.dropTarget
+      const target = w ? internalTarget(w, copy) : deps.dropTarget
+      const home = w ? isHome(w, target!, copy) : false
       deps.clearDrag()
+      if (home) return
       if (copy) {
         if (target?.kind === 'into') deps.copyPageInto(source, target.docId, target.index)
         else if (target?.kind === 'between') deps.copyPageToNewDoc(source, target.docIndex)

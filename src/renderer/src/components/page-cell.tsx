@@ -22,6 +22,7 @@ interface PageCellProps {
   renderVersion: number
   selected: boolean
   collapsed: boolean
+  lifted?: boolean
   hidden: boolean
   dimmed: boolean
   highlightQuery: string | undefined
@@ -45,6 +46,7 @@ function PageCellImpl({
   renderVersion,
   selected,
   collapsed,
+  lifted,
   hidden,
   dimmed,
   highlightQuery,
@@ -71,6 +73,7 @@ function PageCellImpl({
         'page' +
         (selected ? ' selected' : '') +
         (collapsed ? ' collapsing' : '') +
+        (lifted ? ' lifted' : '') +
         (dimmed ? ' dimmed' : '') +
         (aiActive ? ' ai-active' : '')
       }

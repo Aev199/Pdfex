@@ -20,7 +20,7 @@ import applyScript from './apply.ps1?raw'
 import type { AppInfo, UpdateOffer, UpdateState } from '../../preload/app-types'
 
 // Not Electron's fs: it would treat the update's app.asar as a folder.
-const { existsSync, readFileSync } = originalFs
+const { appendFileSync, existsSync, openSync, readFileSync, writeFileSync } = originalFs
 const { rename, rm, writeFile, readFile, unlink, mkdir } = originalFs.promises
 
 // Updates as in Papka: GitHub releases with latest.json (version, SHA-256,
@@ -41,6 +41,22 @@ const updatesDir = (): string => join(app.getPath('userData'), 'updates')
 const staged = (): string => join(updatesDir(), 'staged')
 const previous = (): string => join(updatesDir(), 'previous')
 const resultFile = (): string => join(updatesDir(), 'result.json')
+// Written when PDFx hands the swap over on quit; the script's result.json
+// answers it. One without the other at the next start: the swap never ran.
+const handoffFile = (): string => join(updatesDir(), 'handoff.json')
+const logFile = (): string => join(updatesDir(), 'update.log')
+
+function log(text: string): void {
+  try {
+    appendFileSync(logFile(), `${new Date().toISOString().slice(0, 19)} ${text}\r\n`)
+  } catch {
+    // the log is a convenience
+  }
+}
+
+const readJson = async (path: string): Promise<Record<string, unknown>> =>
+  // PowerShell 5 writes UTF-8 with a byte order mark.
+  JSON.parse((await readFile(path, 'utf8')).replace(/^\uFEFF/, '')) as Record<string, unknown>
 // A folder (or URL) holding latest.json and the ZIP, instead of GitHub; for
 // tests and for networks where GitHub is closed.
 const feed = (): string | undefined => process.env.PDFX_UPDATE_FEED || undefined
@@ -59,9 +75,14 @@ function readStamp(): Stamp {
 
 // Only stamped portable Windows releases replace themselves; a dev build
 // would always look outdated.
+// Windows CI runs the whole update on a "ci" build: find it in a feed
+// folder, download, close, swap, start again (scripts/test-update-e2e.ps1).
+const selfTest = (): boolean =>
+  !!process.env.PDFX_UPDATE_SELFTEST && !!feed() && app.isPackaged && process.platform === 'win32'
+
 function isRelease(): boolean {
   const release = stamp.channel === 'stable' || stamp.channel === 'beta'
-  return process.platform === 'win32' && app.isPackaged && release && !!stamp.commit
+  return (process.platform === 'win32' && app.isPackaged && release && !!stamp.commit) || selfTest()
 }
 
 // Checks run in any release; installing also needs the data folder next to
@@ -105,16 +126,31 @@ export async function initUpdater(dataPortable: boolean): Promise<void> {
   stamp = readStamp()
   const dir = updatesDir()
   // The outcome of the swap done when PDFx last closed.
+  const handoff = await readJson(handoffFile()).catch(() => null)
+  await unlink(handoffFile()).catch(() => {})
   try {
-    const result = JSON.parse(await readFile(resultFile(), 'utf8')) as Record<string, unknown>
+    const result = await readJson(resultFile())
     await unlink(resultFile())
     state.applied = {
       ok: result.ok === true,
       version: typeof result.version === 'string' ? result.version : '',
       message: typeof result.message === 'string' ? result.message : ''
     }
+    log(
+      `started as ${stamp.version}; the swap reported ${result.ok === true ? 'success' : 'failure'}`
+    )
   } catch {
-    // nothing was applied
+    if (handoff) {
+      // PowerShell never got to write its result: blocked by policy or an
+      // antivirus, or not started at all.
+      const version = typeof handoff.version === 'string' ? handoff.version : ''
+      state.applied = {
+        ok: false,
+        version,
+        message: `Windows did not run the PowerShell step that replaces the files. Details: ${logFile()}`
+      }
+      log(`started as ${stamp.version}; no result from the swap to ${version}`)
+    }
   }
   await rm(join(dir, 'download.zip.part'), { force: true }).catch(() => {})
   await rm(join(dir, 'staged.tmp'), { recursive: true, force: true }).catch(() => {})
@@ -148,6 +184,16 @@ export async function initUpdater(dataPortable: boolean): Promise<void> {
       set({ phase: { kind: 'idle' }, dialog: false })
     }
   })
+
+  if (selfTest() && state.phase.kind === 'idle') {
+    log('self-test: looking for an update')
+    await check(true)
+    // check() and download() move the phase on; TypeScript can't see that.
+    const phase = (): string => updateState().phase.kind
+    if (phase() === 'available') await download()
+    if (phase() === 'ready') restart()
+    return
+  }
 
   if (!canSelfUpdate()) return
   const tick = (): void => {
@@ -330,6 +376,11 @@ export function dismiss(): void {
   set({ dialog: false, applied: null })
 }
 
+// The unpacked new version, for installing it by hand.
+export function stagedFolder(): string {
+  return staged()
+}
+
 export function show(): void {
   set({ dialog: true })
 }
@@ -380,8 +431,6 @@ export function restart(): void {
   app.quit()
 }
 
-const quote = (text: string): string => `'${text.replace(/'/g, "''")}'`
-
 // Called from will-quit: hands an unpacked update or a requested rollback to
 // the swap script. A plain close applies it too, without starting PDFx again.
 export function applyOnQuit(): void {
@@ -408,24 +457,50 @@ export function applyOnQuit(): void {
   }
   if (!args) return
   try {
-    if (phase.kind === 'ready') void unlink(join(dir, 'staged.json')).catch(() => {})
-    const params = {
-      ...args,
-      AppDir: appDir(),
-      ResultFile: resultFile(),
-      Relaunch: relaunch ? '1' : ''
-    }
-    const call = Object.entries(params)
-      .map(([key, value]) => `-${key} ${quote(value)}`)
-      .join(' ')
-    const script = `& {\n${applyScript}\n} ${call} -WaitPid ${process.pid}`
-    const encoded = Buffer.from(script, 'utf16le').toString('base64')
-    spawn(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-EncodedCommand', encoded],
-      { detached: true, stdio: 'ignore', windowsHide: true, cwd: dir }
-    ).unref()
+    // A plain script file rather than an encoded command line: antivirus
+    // behaviour rules single out hidden -EncodedCommand runs.
+    const script = join(dir, 'apply.ps1')
+    writeFileSync(script, `\uFEFF${applyScript}`)
+    writeFileSync(handoffFile(), JSON.stringify({ version: args.Version, kind: phase.kind }))
+    writeFileSync(
+      join(dir, 'apply.json'),
+      JSON.stringify({
+        ...args,
+        AppDir: appDir(),
+        ResultFile: resultFile(),
+        Relaunch: relaunch ? '1' : '',
+        WaitPid: process.pid
+      })
+    )
+    const output = openSync(join(dir, 'powershell.log'), 'w')
+    // cmd.exe can't sit in a \\server\share folder: there the script goes by
+    // its full path instead.
+    const scriptArg = dir.startsWith('\\\\') ? `"${script}"` : 'apply.ps1'
+    // A detached child gets no console (DETACHED_PROCESS), and PowerShell
+    // without one exits before running anything. cmd.exe copes, and its
+    // `start` gives PowerShell a console of its own (minimised, then hidden).
+    // No paths on the command line: cwd is the updates folder and the
+    // parameters are in apply.json.
+    const child = spawn(
+      'cmd.exe',
+      [
+        '/d',
+        '/c',
+        `start "PDFx update" /min powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ${scriptArg}`
+      ],
+      {
+        detached: true,
+        stdio: ['ignore', output, output],
+        windowsHide: true,
+        windowsVerbatimArguments: true,
+        cwd: dir
+      }
+    )
+    child.unref()
+    log(
+      `PDFx ${stamp.version} closing; swap to ${args.Version} handed to PowerShell via cmd.exe (pid ${child.pid ?? '?'})`
+    )
   } catch (error) {
-    console.error('update: could not start the swap', error)
+    log(`could not start PowerShell: ${reason(error)}`)
   }
 }

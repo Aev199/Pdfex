@@ -42,6 +42,9 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
         return updater.dismiss()
       case 'show':
         return updater.show()
+      case 'files':
+        await shell.openPath(updater.stagedFolder())
+        return
       case 'restart':
         return updater.restart()
       case 'rollback':

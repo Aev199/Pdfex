@@ -32,6 +32,7 @@ interface CollectionCanvasProps {
   draggingPage: PageRef | null
   dropTarget: DropTarget | null
   collapsedId: string | null
+  liftedId: string | null
   externalCount: number
   pendingImports: PendingImport[]
   canvasRef: React.Ref<CanvasHandle>
@@ -113,6 +114,7 @@ export function CollectionCanvas(props: CollectionCanvasProps): React.JSX.Elemen
         hoveredDocId={props.hoveredDocId}
         pagesDraggable={props.pagesDraggable}
         collapsedId={props.collapsedId}
+        liftedId={props.liftedId}
         draggingPage={draggingPage}
         hiddenPageId={props.hiddenPageId}
         marks={props.marks}

@@ -538,7 +538,6 @@
   opacity: 0.55;
 }
 
-
 /* Both overlays sit exactly on the page card, in its coordinate space. */
 .fv-annots,
 
@@ -1250,4 +1249,11 @@
 .full-slide {
   flex: 0 0 auto;
   height: 100cqh;
+}
+
+/* A page picked up for dragging stays in its place, faded, until the
+   pointer moves to another place; only then do the neighbours make room. */
+.page.lifted {
+  opacity: 0.35;
+  transition: opacity 0.12s ease;
 }
