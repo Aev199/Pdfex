@@ -25,4 +25,3 @@ export function drawElements(
     if (element.kind === 'text') drawTextElement(page, element, fontForElement(element, fonts))
   }
 }
-

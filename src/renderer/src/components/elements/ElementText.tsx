@@ -91,7 +91,7 @@ export function ElementText({
         fill={element.color}
         fontSize={element.fontSize}
         fontFamily={fontFamily}
-          fontWeight={fontWeight}
+        fontWeight={fontWeight}
         xmlSpace="preserve"
       >
         {renderSpans()}
