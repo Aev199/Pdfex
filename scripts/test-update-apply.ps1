@@ -72,7 +72,8 @@ Check ($running.Count -gt 0) 'PDFx was started again'
 $running | ForEach-Object { taskkill /F /T /PID $_.Id 2>$null | Out-Null }
 
 # 3. A broken update (no pdfx.exe) changes nothing.
-Remove-Item $result
+# The restarted PDFx has already read (and removed) the outcome of step 2.
+Remove-Item $result -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $staged | Out-Null
 'x' | Set-Content (Join-Path $staged 'junk.txt')
 $swap = Start-Swap $staged (Join-Path $updates 'previous.new') $previous '9.9.10' 0 ''
