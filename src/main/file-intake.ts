@@ -13,7 +13,8 @@ export interface OpenedFile {
   mtimeMs?: number
 }
 
-export const IMPORTABLE = /\.(pdf|pdfx|pdfxs|docx?|odt|xlsx?|ods|pptx?|odp|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
+export const IMPORTABLE =
+  /\.(pdf|pdfx|pdfxs|docx?|docm|dotx?|dotm|odt|xlsx?|xlsm|xlsb|xltx?|xltm|ods|pptx?|pptm|ppsx?|potx?|odp|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
 
 // Documents named on a command line (or dropped on pdfx.exe), made absolute against the directory that
 // command ran in (a second launch's cwd differs from ours).

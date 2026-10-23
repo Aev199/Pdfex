@@ -24,15 +24,30 @@ const APP_EXE: Record<OfficeApp, string> = {
   powerpoint: 'POWERPNT.EXE'
 }
 
+// Current and 97–2003 formats, templates, macro-enabled files, shows.
 const EXT_APP: Record<string, OfficeApp> = {
   doc: 'word',
   docx: 'word',
+  docm: 'word',
+  dot: 'word',
+  dotx: 'word',
+  dotm: 'word',
   odt: 'word',
   xls: 'excel',
   xlsx: 'excel',
+  xlsm: 'excel',
+  xlsb: 'excel',
+  xlt: 'excel',
+  xltx: 'excel',
+  xltm: 'excel',
   ods: 'excel',
   ppt: 'powerpoint',
   pptx: 'powerpoint',
+  pptm: 'powerpoint',
+  pps: 'powerpoint',
+  ppsx: 'powerpoint',
+  pot: 'powerpoint',
+  potx: 'powerpoint',
   odp: 'powerpoint'
 }
 

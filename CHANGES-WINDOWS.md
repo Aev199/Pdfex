@@ -50,7 +50,8 @@
 
 ## Документы Office
 
-- Word, Excel, PowerPoint и OpenDocument перетаскиваются на холст и
+- Word, Excel, PowerPoint (включая форматы 97–2003, шаблоны, файлы с
+  макросами и показы) и OpenDocument перетаскиваются на холст и
   превращаются в PDF установленным Microsoft Office (через COM, макросы
   выключены) или LibreOffice (headless). Без них показывается подсказка,
   что установить. Механизм Office перенесён из PDFx Plus, LibreOffice

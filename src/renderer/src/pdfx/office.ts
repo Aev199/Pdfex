@@ -4,12 +4,14 @@
 
 export class ConvertError extends Error {}
 
-const OFFICE_EXT = /\.(docx?|odt|xlsx?|ods|pptx?|odp)$/i
+// Kept in step with EXT_APP in main/office.ts.
+const OFFICE_EXT =
+  /\.(docx?|docm|dotx?|dotm|odt|xlsx?|xlsm|xlsb|xltx?|xltm|ods|pptx?|pptm|ppsx?|potx?|odp)$/i
 
 type OfficeKind = 'word' | 'excel' | 'powerpoint'
 
 const kindOf = (ext: string): OfficeKind =>
-  /^(doc|odt)/.test(ext) ? 'word' : /^(ppt|odp)/.test(ext) ? 'powerpoint' : 'excel'
+  /^(do|odt)/.test(ext) ? 'word' : /^(pp|po|odp)/.test(ext) ? 'powerpoint' : 'excel'
 
 const LABEL: Record<OfficeKind, string> = {
   word: 'Word',
