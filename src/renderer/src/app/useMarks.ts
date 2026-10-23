@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { DEFAULT_MARK_COLORS } from '../edit/types'
-import type { MarkKind, MarkMap, MarkRect } from '../edit/types'
+import type { MarkKind, MarkLook, MarkMap, MarkRect } from '../edit/types'
 import { rectsOverlap } from '../edit/selection'
 import { ACTIONS } from './undo'
 import type { MarkUndoEntry, UndoEntry } from './undo'
@@ -11,10 +11,16 @@ export function useMarks(pushUndo: (entry: UndoEntry) => void, initial: MarkMap 
   marksRef.current = marks
 
   const addMark = useCallback(
-    (pageId: string, kind: MarkKind, rects: MarkRect[]) => {
+    (pageId: string, kind: MarkKind, rects: MarkRect[], look?: MarkLook) => {
       if (rects.length === 0) return
       const map = marksRef.current
-      const added = { id: crypto.randomUUID(), kind, color: DEFAULT_MARK_COLORS[kind], rects }
+      const added = {
+        id: crypto.randomUUID(),
+        kind,
+        color: kind === 'highlight' && look ? look.color : DEFAULT_MARK_COLORS[kind],
+        ...(kind === 'highlight' && look && look.style !== 'fill' ? { style: look.style } : {}),
+        rects
+      }
       pushUndo({ action: ACTIONS.MARK, value: 'add', payload: { pageId, marks: [added] } })
       setMarks({ ...map, [pageId]: [...(map[pageId] ?? []), added] })
     },
@@ -22,7 +28,7 @@ export function useMarks(pushUndo: (entry: UndoEntry) => void, initial: MarkMap 
   )
 
   const toggleMark = useCallback(
-    (pageId: string, kind: MarkKind, rects: MarkRect[]) => {
+    (pageId: string, kind: MarkKind, rects: MarkRect[], look?: MarkLook) => {
       if (rects.length === 0) return
       const map = marksRef.current
       const page = map[pageId] ?? []
@@ -33,7 +39,7 @@ export function useMarks(pushUndo: (entry: UndoEntry) => void, initial: MarkMap 
         pushUndo({ action: ACTIONS.MARK, value: 'remove', payload: { pageId, marks: removed } })
         setMarks({ ...map, [pageId]: page.filter((m) => !removed.includes(m)) })
       } else {
-        addMark(pageId, kind, rects)
+        addMark(pageId, kind, rects, look)
       }
     },
     [pushUndo, addMark]

@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { lookOf } from '../../elements/types'
 import type { TextElement } from '../../elements/types'
 import { TextEditor } from './TextEditor'
 
@@ -33,6 +34,8 @@ export function EditTextLayer({
           origin={element.origin}
           scale={scale}
           fontSize={element.fontSize}
+          look={lookOf(element)}
+          color={element.color}
           initialText={element.text}
           onCommit={onCommit}
           onCancel={() => onCommit('')}

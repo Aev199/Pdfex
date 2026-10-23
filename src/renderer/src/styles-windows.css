@@ -1257,3 +1257,18 @@
   opacity: 0.35;
   transition: opacity 0.12s ease;
 }
+
+.annotate-select {
+  height: 30px;
+  padding: 0 6px;
+  border-radius: 7px;
+  border: 1px solid var(--hairline);
+  background: var(--group-bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.annotate-select option {
+  background: var(--overlay-strong);
+}

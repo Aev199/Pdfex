@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
-import type { ElementPoint } from '../../elements/types'
+import type { ElementPoint, TextStyle } from '../../elements/types'
 import { TextEditor } from './TextEditor'
 
 interface TypeLayerProps {
   naturalHeight: number
+  style?: TextStyle
   onCommit: (text: string, origin: ElementPoint) => void
 }
 
@@ -12,7 +13,7 @@ interface EditorState {
   scale: number
 }
 
-export function TypeLayer({ naturalHeight, onCommit }: TypeLayerProps): React.JSX.Element {
+export function TypeLayer({ naturalHeight, style, onCommit }: TypeLayerProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const [editor, setEditor] = useState<EditorState | null>(null)
 
@@ -50,6 +51,9 @@ export function TypeLayer({ naturalHeight, onCommit }: TypeLayerProps): React.JS
         <TextEditor
           origin={editor.origin}
           scale={editor.scale}
+          fontSize={style?.fontSize}
+          look={style}
+          color={style?.color}
           onCommit={(text) => {
             setEditor(null)
             onCommit(text, editor.origin)

@@ -32,6 +32,13 @@ export function useElements(
     [pushUndo]
   )
 
+  // Any element made by a factory that gets the next element number.
+  const addCreated = useCallback(
+    (pageId: string, make: (number: number) => PageElement | null): PageElement | null =>
+      addElement(pageId, make(nextNumberRef.current)),
+    [addElement]
+  )
+
   const addInk = useCallback(
     (
       pageId: string,
@@ -145,6 +152,17 @@ export function useElements(
     [pushUndo]
   )
 
+  // Replace an element with a changed copy (restyled, retyped), one undo step.
+  const replaceElement = useCallback(
+    (pageId: string, elementId: string, change: (element: PageElement) => PageElement | null) => {
+      const element = elementsRef.current[pageId]?.find((e) => e.id === elementId)
+      if (!element) return
+      const after = change(element)
+      if (after && after !== element) updateElement(pageId, 'edit', element, after)
+    },
+    [updateElement]
+  )
+
   const moveElement = useCallback(
     (pageId: string, elementId: string, dx: number, dy: number) => {
       const element = elementsRef.current[pageId]?.find((e) => e.id === elementId)
@@ -221,6 +239,8 @@ export function useElements(
     elementsRef,
     copyToPages,
     nextNumberRef,
+    addCreated,
+    replaceElement,
     addInk,
     addShape,
     removeElements,

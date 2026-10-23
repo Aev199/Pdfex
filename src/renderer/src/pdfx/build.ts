@@ -3,8 +3,8 @@ import type { PDFPage } from 'pdf-lib'
 
 import { MANIFEST_NAME, PDFX_VERSION } from './format'
 import { drawMarks } from './marks'
-import { drawElements, hasTextElements } from './elements'
-import { embedElementFonts } from './elements/fonts'
+import { drawElements } from './elements'
+import { embedElementFonts, textRunsOf } from './elements/fonts'
 import type { ElementFonts } from './elements/fonts'
 import { registerAcroForm } from './form-fields'
 import type { ExportDocument, ExportPage, PdfxManifest, RasterExportPage } from './format'
@@ -25,8 +25,9 @@ async function elementFonts(
   ctx: BuildContext,
   page: ExportPage
 ): Promise<ElementFonts | undefined> {
-  if (!hasTextElements(page.elements)) return undefined
-  ctx.fonts = await embedElementFonts(ctx.output, page.elements, ctx.fonts)
+  const runs = textRunsOf(page.elements)
+  if (runs.length === 0) return undefined
+  ctx.fonts = await embedElementFonts(ctx.output, runs, ctx.fonts)
   return ctx.fonts
 }
 

@@ -208,7 +208,11 @@ export function FullViewPage(props: FullViewPageProps): React.JSX.Element {
             />
           )}
           {isCurrent && selectTool === 'text' && (
-            <TypeLayer naturalHeight={n.height} onCommit={onAddText} />
+            <TypeLayer
+              naturalHeight={n.height}
+              style={props.annotate.textStyle}
+              onCommit={onAddText}
+            />
           )}
         </PageRotor>
       </div>

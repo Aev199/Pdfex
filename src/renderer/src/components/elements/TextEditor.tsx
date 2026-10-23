@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   TEXT_COLOR,
-  TEXT_FONT_FAMILY,
+  TEXT_FONT_FAMILIES,
   TEXT_FONT_SIZE,
   TEXT_LINE_HEIGHT,
   textLines
 } from '../../elements/types'
-import type { ElementPoint } from '../../elements/types'
+import type { ElementPoint, TextLook } from '../../elements/types'
 import { measureLineWidth } from '../../elements/measure'
 
 interface TextEditorProps {
   origin: ElementPoint
   scale: number
   fontSize?: number
+  look?: TextLook
+  color?: string
   initialText?: string
   onCommit: (text: string) => void
   onCancel: () => void
@@ -25,6 +27,8 @@ export function TextEditor({
   origin,
   scale,
   fontSize = TEXT_FONT_SIZE,
+  look = { font: 'sans', bold: false },
+  color = TEXT_COLOR,
   initialText = '',
   onCommit,
   onCancel
@@ -71,7 +75,7 @@ export function TextEditor({
   const lines = textLines(value)
   const widthPoints = Math.max(
     MIN_WIDTH_POINTS,
-    ...lines.map((line) => measureLineWidth(line, fontSize))
+    ...lines.map((line) => measureLineWidth(line, fontSize, look))
   )
   return (
     <textarea
@@ -88,8 +92,9 @@ export function TextEditor({
         height: lines.length * fontSize * TEXT_LINE_HEIGHT * scale,
         fontSize: fontSize * scale,
         lineHeight: TEXT_LINE_HEIGHT,
-        fontFamily: TEXT_FONT_FAMILY,
-        color: TEXT_COLOR
+        fontFamily: TEXT_FONT_FAMILIES[look.font],
+        fontWeight: look.bold ? 'bold' : undefined,
+        color
       }}
       onChange={(event) => setValue(event.target.value)}
       onBlur={() => finish(true)}

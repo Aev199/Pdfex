@@ -1,5 +1,5 @@
-import { TEXT_FONT_FAMILY, TEXT_LINE_HEIGHT, TEXT_MARK_PAD, textLines } from './types'
-import type { ElementRect, TextElement } from './types'
+import { TEXT_FONT_FAMILIES, TEXT_LINE_HEIGHT, TEXT_MARK_PAD, lookOf, textLines } from './types'
+import type { ElementRect, TextElement, TextLook } from './types'
 import { lineMarkRuns, lineSpans } from './text-marks'
 import type { MarkRun } from './text-marks'
 
@@ -14,26 +14,40 @@ function context(): CanvasRenderingContext2D {
   return cached
 }
 
-export function measureLineWidth(line: string, fontSize: number): number {
+const PLAIN: TextLook = { font: 'sans', bold: false }
+
+export const cssFont = (fontSize: number, look: TextLook = PLAIN): string =>
+  `${look.bold ? 'bold ' : ''}${fontSize}px ${TEXT_FONT_FAMILIES[look.font]}`
+
+export function measureLineWidth(line: string, fontSize: number, look: TextLook = PLAIN): number {
   const ctx = context()
-  ctx.font = `${fontSize}px ${TEXT_FONT_FAMILY}`
+  ctx.font = cssFont(fontSize, look)
   return ctx.measureText(line).width
 }
 
-export function nearestCharOffset(line: string, fontSize: number, x: number): number {
+export function nearestCharOffset(
+  line: string,
+  fontSize: number,
+  x: number,
+  look: TextLook = PLAIN
+): number {
   let previous = 0
   for (let i = 1; i <= line.length; i++) {
-    const width = measureLineWidth(line.slice(0, i), fontSize)
+    const width = measureLineWidth(line.slice(0, i), fontSize, look)
     if (width >= x) return x - previous <= width - x ? i - 1 : i
     previous = width
   }
   return line.length
 }
 
-export function textBlockSize(text: string, fontSize: number): { w: number; h: number } {
+export function textBlockSize(
+  text: string,
+  fontSize: number,
+  look: TextLook = PLAIN
+): { w: number; h: number } {
   const lines = textLines(text)
   return {
-    w: Math.max(...lines.map((line) => measureLineWidth(line, fontSize))),
+    w: Math.max(...lines.map((line) => measureLineWidth(line, fontSize, look))),
     h: lines.length * fontSize * TEXT_LINE_HEIGHT
   }
 }
@@ -54,8 +68,13 @@ export function findMatchRects(
     for (;;) {
       const at = haystack.indexOf(needle, from)
       if (at === -1) break
-      const prefix = measureLineWidth(line.text.slice(0, at), element.fontSize)
-      const width = measureLineWidth(line.text.slice(at, at + needle.length), element.fontSize)
+      const look = lookOf(element)
+      const prefix = measureLineWidth(line.text.slice(0, at), element.fontSize, look)
+      const width = measureLineWidth(
+        line.text.slice(at, at + needle.length),
+        element.fontSize,
+        look
+      )
       rects.push({
         x: element.origin.x + prefix / pageWidth,
         y: element.origin.y + (line.row * lineHeight) / pageHeight,
@@ -80,10 +99,16 @@ export function textMarkRects(
   const lineHeight = element.fontSize * TEXT_LINE_HEIGHT
   return lineSpans(element.text).flatMap((line) =>
     lineMarkRuns(line, element.marks).map((run) => {
-      const prefix = measureLineWidth(line.text.slice(0, run.start - line.start), element.fontSize)
+      const look = lookOf(element)
+      const prefix = measureLineWidth(
+        line.text.slice(0, run.start - line.start),
+        element.fontSize,
+        look
+      )
       const width = measureLineWidth(
         line.text.slice(run.start - line.start, run.end - line.start),
-        element.fontSize
+        element.fontSize,
+        look
       )
       return {
         kind: run.kind,

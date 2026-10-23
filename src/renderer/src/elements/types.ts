@@ -30,12 +30,27 @@ export interface TextMark {
   end: number
 }
 
+export type TextFont = 'sans' | 'serif' | 'mono'
+
+// Typeface of a text element; missing fields mean sans, regular.
+export interface TextLook {
+  font: TextFont
+  bold: boolean
+}
+
+export interface TextStyle extends TextLook {
+  fontSize: number
+  color: string
+}
+
 export interface TextElement {
   id: string
   kind: 'text'
   number: number
   color: string
   fontSize: number
+  font?: TextFont
+  bold?: boolean
   text: string
   origin: ElementPoint
   marks: TextMark[]
@@ -78,7 +93,27 @@ export const TEXT_COLOR = '#16161c'
 
 export const TEXT_FONT_SIZE = 14
 
-export const TEXT_FONT_FAMILY = 'Helvetica, Arial, sans-serif'
+export const TEXT_FONT_FAMILIES: Record<TextFont, string> = {
+  sans: 'Helvetica, Arial, sans-serif',
+  serif: '"Times New Roman", Times, serif',
+  mono: '"Courier New", Courier, monospace'
+}
+
+export const TEXT_FONT_FAMILY = TEXT_FONT_FAMILIES.sans
+
+export const TEXT_SIZES = [10, 12, 14, 18, 24, 32]
+
+export const lookOf = (e: { font?: TextFont; bold?: boolean }): TextLook => ({
+  font: e.font ?? 'sans',
+  bold: !!e.bold
+})
+
+export const DEFAULT_TEXT_STYLE: TextStyle = {
+  font: 'sans',
+  bold: false,
+  fontSize: 14,
+  color: '#16161c'
+}
 
 export const TEXT_LINE_HEIGHT = 1.25
 

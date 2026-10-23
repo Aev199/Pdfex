@@ -26,5 +26,3 @@ export function drawElements(
   }
 }
 
-export const hasTextElements = (elements: PageElement[] | undefined): boolean =>
-  !!elements && elements.some((e) => e.kind === 'text')

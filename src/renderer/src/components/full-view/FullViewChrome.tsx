@@ -1,8 +1,6 @@
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '../icons'
 import { isMac } from './geometry'
 import type { EditTool } from '../../edit/types'
-import type { DrawStyle } from '../../elements/types'
-import { AnnotateBar } from './AnnotateBar'
 import { useEffect, useState } from 'react'
 
 interface FullViewChromeProps {
@@ -17,8 +15,8 @@ interface FullViewChromeProps {
   onFinishEdit: () => void
   onRevert: () => void
   onToggleTool: (tool: EditTool) => void
-  drawStyle: DrawStyle
-  onDrawStyle: (style: DrawStyle) => void
+  // The annotation toolbar, shown while editing.
+  annotateBar: React.ReactNode
   runClose: () => void
   goToPage: (pi: number) => void
   sidebarOpen: boolean
@@ -41,8 +39,7 @@ export function FullViewChrome({
   onFinishEdit,
   onRevert,
   onToggleTool,
-  drawStyle,
-  onDrawStyle,
+  annotateBar,
   runClose,
   goToPage,
   sidebarOpen,
@@ -121,9 +118,7 @@ export function FullViewChrome({
           </button>
         </div>
       </header>
-      {editing && (
-        <AnnotateBar tool={tool} style={drawStyle} onTool={onToggleTool} onStyle={onDrawStyle} />
-      )}
+      {editing && annotateBar}
 
       <button
         className="full-nav prev"

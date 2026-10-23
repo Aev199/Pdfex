@@ -708,7 +708,8 @@ export function WorkspaceView({
               onAddInk={elementState.addInk}
               onAddShape={elementState.addShape}
               onRemoveElements={elementState.removeElements}
-              onAddText={elementState.addText}
+              onAddElement={elementState.addCreated}
+              onReplaceElement={elementState.replaceElement}
               onRemoveElement={elementState.removeElement}
               onMoveElement={elementState.moveElement}
               onToggleTextMark={elementState.toggleTextMark}

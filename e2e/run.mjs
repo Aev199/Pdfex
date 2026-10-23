@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, PDFName } from 'pdf-lib'
 import { inflateSync } from 'node:zlib'
 import { createHash } from 'node:crypto'
 import { strToU8, zipSync } from 'fflate'
@@ -290,6 +290,59 @@ function pageContent(doc, index) {
     })
     .join('\n')
 }
+
+test('styled text and an underline are exported with their fonts and colours', async () => {
+  const { app, page } = await launch(freshData(), [files.second])
+  const out = join(work, 'styled.pdf')
+  try {
+    await rendered(page)
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    await page.locator('.full-actions .btn', { hasText: 'Edit' }).click()
+    await page.locator('.full-actions .btn', { hasText: 'Add Text' }).click()
+    await page.locator('.annotate-select[title="Font"]').selectOption('serif')
+    await page.locator('.annotate-tool[title="Bold"]').click()
+    await page.locator('.annotate-swatch').nth(1).click() // red
+    const fp = await page.locator('.full-page').first().boundingBox()
+    const at = (fx, fy) => [fp.x + fp.width * fx, fp.y + fp.height * fy]
+    await page.mouse.click(...at(0.3, 0.5))
+    await page.keyboard.type('Проверка')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+    assert.ok((await page.locator('.full-page text[font-weight="bold"]').count()) >= 1)
+    await page.locator('.full-actions .btn', { hasText: 'Highlight' }).click()
+    await page.locator('.annotate-tool[title="Underline"]').click()
+    await page.locator('.annotate-swatch[title="green"]').click()
+    await page.waitForSelector('.full-page .edit-select-layer span')
+    await page.waitForTimeout(500)
+    // A line below the annotation bar.
+    const line = await page.locator('.full-page .edit-select-layer span').nth(6).boundingBox()
+    await page.mouse.move(line.x + 2, line.y + line.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(line.x + line.width - 2, line.y + line.height / 2, { steps: 8 })
+    await page.mouse.up()
+    await page.waitForTimeout(300)
+    assert.ok((await page.locator('.mark-rect.line').count()) > 0)
+    await page.locator('.full-actions .btn', { hasText: 'Done' }).click()
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await mockSaveDialog(app, out)
+    await menu(app, 'export-pdf')
+    for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
+  } finally {
+    await app.close()
+  }
+  const doc = await PDFDocument.load(readFileSync(out))
+  const fonts = doc.context
+    .enumerateIndirectObjects()
+    .map(([, obj]) => obj?.get?.(PDFName.of('BaseFont'))?.toString() ?? '')
+    .filter(Boolean)
+  assert.ok(
+    fonts.some((f) => f.includes('DejaVuSerif-Bold')),
+    fonts.join(' ')
+  )
+  assert.match(pageContent(doc, 0), /0\.49\d* 0\.86\d* 0\.52\d* rg/)
+})
 
 test('reader: thumbnails, page jump, rotation and printing', async () => {
   const { app, page } = await launch(freshData(), [files.report])

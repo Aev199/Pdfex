@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DocEntry } from '../types'
-import type { MarkKind, MarkMap, MarkRect } from '../edit/types'
+import type { MarkKind, MarkLook, MarkMap, MarkRect } from '../edit/types'
 import { isMarkTool } from '../edit/types'
 import type { FieldValue, FormValuesBySource } from '../forms/types'
-import type { DrawStyle, ElementMap, ElementPoint, ShapeKind } from '../elements/types'
+import type {
+  DrawStyle,
+  ElementMap,
+  ElementPoint,
+  PageElement,
+  ShapeKind,
+  TextStyle
+} from '../elements/types'
+import { createTextElement, restyledTextElement } from '../elements/create'
+import { AnnotateBar } from './full-view/AnnotateBar'
 import type { AnnotateHandlers } from './full-view/annotate'
 import type { TextSpan } from '../elements/text-marks'
 import type { Rect } from './full-view/geometry'
@@ -27,7 +36,7 @@ interface FullViewProps {
   startPageId: string
   originRect: Rect | null
   marks: MarkMap
-  onToggleMark: (pageId: string, kind: MarkKind, rects: MarkRect[]) => void
+  onToggleMark: (pageId: string, kind: MarkKind, rects: MarkRect[], look?: MarkLook) => void
   onRestoreMarks: (map: MarkMap) => void
   formValues: FormValuesBySource
   onFieldChange: (sourceId: string, fieldName: string, value: FieldValue) => void
@@ -49,12 +58,13 @@ interface FullViewProps {
     style: DrawStyle
   ) => void
   onRemoveElements: (pageId: string, ids: string[]) => void
-  onAddText: (
+  // Add an element made from the next element number.
+  onAddElement: (pageId: string, make: (number: number) => PageElement | null) => void
+  // Replace an element with a changed copy, one undo step.
+  onReplaceElement: (
     pageId: string,
-    text: string,
-    origin: ElementPoint,
-    pageWidth: number,
-    pageHeight: number
+    elementId: string,
+    change: (element: PageElement) => PageElement | null
   ) => void
   onRemoveElement: (pageId: string, elementId: string) => void
   onMoveElement: (pageId: string, elementId: string, dx: number, dy: number) => void
@@ -94,7 +104,8 @@ export function FullView({
   onAddInk,
   onAddShape,
   onRemoveElements,
-  onAddText,
+  onAddElement,
+  onReplaceElement,
   onRemoveElement,
   onMoveElement,
   onToggleTextMark,
@@ -178,17 +189,62 @@ export function FullView({
     ...controls
   })
 
-  const { drawStyle } = edit
+  const { drawStyle, textStyle } = edit
   const annotate = useMemo<AnnotateHandlers>(
     () => ({
       style: drawStyle,
+      textStyle,
       onPen: (pageId, points, w, h) => onAddInk(pageId, points, w, h, drawStyle),
       onShape: (pageId, shape, from, to, w, h) =>
         onAddShape(pageId, shape, from, to, w, h, drawStyle),
       onErase: onRemoveElements
     }),
-    [drawStyle, onAddInk, onAddShape, onRemoveElements]
+    [drawStyle, textStyle, onAddInk, onAddShape, onRemoveElements]
   )
+
+  const onAddText = useCallback(
+    (pageId: string, text: string, origin: ElementPoint, w: number, h: number) =>
+      onAddElement(pageId, (n) => createTextElement(text, origin, n, w, h, undefined, textStyle)),
+    [onAddElement, textStyle]
+  )
+
+  // The selected element, when it is text: the text controls restyle it.
+  const selectedText = useMemo(() => {
+    const sel = selection.selected
+    const element = sel ? elements[sel.pageId]?.find((e) => e.id === sel.elementId) : undefined
+    return sel && element?.kind === 'text' ? { pageId: sel.pageId, element } : null
+  }, [selection.selected, elements])
+  const pageSize = useCallback(
+    (pageId: string) => {
+      for (const d of docs) {
+        const p = d.pages.find((page) => page.id === pageId)
+        if (p) return { w: p.width, h: p.height }
+      }
+      return null
+    },
+    [docs]
+  )
+  const changeTextStyle = useCallback(
+    (style: TextStyle) => {
+      edit.setTextStyle(style)
+      if (!selectedText || edit.tool !== null) return
+      const size = pageSize(selectedText.pageId)
+      if (!size) return
+      onReplaceElement(selectedText.pageId, selectedText.element.id, (e) =>
+        e.kind === 'text' ? restyledTextElement(e, style, size.w, size.h) : e
+      )
+    },
+    [edit, selectedText, pageSize, onReplaceElement]
+  )
+  const shownTextStyle: TextStyle =
+    selectedText && edit.tool === null
+      ? {
+          font: selectedText.element.font ?? 'sans',
+          bold: !!selectedText.element.bold,
+          fontSize: selectedText.element.fontSize,
+          color: selectedText.element.color
+        }
+      : textStyle
 
   // Reader sidebar (pages / outline), remembered between openings.
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarPref)
@@ -296,7 +352,14 @@ export function FullView({
         hasSelection={selection.selected !== null}
         selectTool={edit.editing ? edit.tool : null}
         onMark={(pageId, rects) => {
-          if (isMarkTool(edit.tool)) onToggleMark(pageId, edit.tool, rects)
+          if (isMarkTool(edit.tool)) {
+            onToggleMark(
+              pageId,
+              edit.tool,
+              rects,
+              edit.tool === 'highlight' ? edit.markLook : undefined
+            )
+          }
         }}
         formValues={formValues}
         onFieldChange={onFieldChange}
@@ -330,8 +393,19 @@ export function FullView({
         onFinishEdit={edit.finishEdit}
         onRevert={edit.revert}
         onToggleTool={edit.toggleTool}
-        drawStyle={edit.drawStyle}
-        onDrawStyle={edit.setDrawStyle}
+        annotateBar={
+          <AnnotateBar
+            tool={edit.tool}
+            style={edit.drawStyle}
+            onTool={edit.toggleTool}
+            onStyle={edit.setDrawStyle}
+            textStyle={shownTextStyle}
+            onTextStyle={changeTextStyle}
+            markLook={edit.markLook}
+            onMarkLook={edit.setMarkLook}
+            textSelected={!!selectedText}
+          />
+        }
         runClose={controls.runClose}
         navByKey={controls.navByKey}
         goToPage={goToPage}
