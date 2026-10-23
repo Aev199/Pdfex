@@ -107,7 +107,7 @@ function PageCellImpl({
       }}
       onDragStart={(e) => {
         e.dataTransfer.setData('application/x-pdfx-page', page.id)
-        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.effectAllowed = 'copyMove'
         const el = e.currentTarget as HTMLElement
         const rect = el.getBoundingClientRect()
         const img = buildPageDragImage(el, rect)

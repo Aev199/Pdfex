@@ -103,6 +103,22 @@ test('page menu, multi-select, undo and redo', async () => {
     await page.keyboard.press('Control+y')
     await page.waitForTimeout(400)
     assert.equal(await pages(), 16)
+
+    // Ctrl-drag copies a page into another document; a plain drag moves it.
+    const all = page.locator('.canvas-world .page[data-page-id]')
+    const firstId = () => all.first().getAttribute('data-page-id')
+    const original = await firstId()
+    const before = await pages()
+    await page.keyboard.down('Control')
+    await all.first().dragTo(all.last())
+    await page.keyboard.up('Control')
+    await page.waitForTimeout(400)
+    assert.equal(await pages(), before + 1)
+    assert.equal(await firstId(), original)
+    await all.first().dragTo(all.last())
+    await page.waitForTimeout(400)
+    assert.equal(await pages(), before + 1)
+    assert.notEqual(await firstId(), original)
   } finally {
     await app.close()
   }

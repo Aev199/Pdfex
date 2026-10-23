@@ -322,6 +322,34 @@ export function useCollection(
     [recordPageMove, commit, setSelected]
   )
 
+  // Ctrl-drag copies; each returns the copy's id (null when nothing changed).
+  const copyPageInto = useCallback(
+    (source: PageRef, targetDocId: string, index: number): string | null => {
+      const prev = docsRef.current
+      const copyId = crypto.randomUUID()
+      const next = moveOps.copyPageInto(prev, source, copyId, targetDocId, index)
+      if (next === prev) return null
+      commit(next, true)
+      setSelected({ docId: targetDocId, pageId: copyId })
+      return copyId
+    },
+    [commit, setSelected]
+  )
+
+  const copyPageToNewDoc = useCallback(
+    (source: PageRef, docIndex: number): string | null => {
+      const prev = docsRef.current
+      const copyId = crypto.randomUUID()
+      const newDocId = crypto.randomUUID()
+      const next = moveOps.copyPageToNewDoc(prev, source, copyId, docIndex, newDocId)
+      if (next === prev) return null
+      commit(next, true)
+      setSelected({ docId: newDocId, pageId: copyId })
+      return copyId
+    },
+    [commit, setSelected]
+  )
+
   const placePageAt = useCallback(
     (pageId: string, at: PagePlacement) => {
       const prev = docsRef.current
@@ -413,6 +441,8 @@ export function useCollection(
     insertPagesIntoDoc,
     movePageInto,
     movePageToNewDoc,
+    copyPageInto,
+    copyPageToNewDoc,
     placePageAt,
     replacePageSource,
     applyPageSource,

@@ -46,6 +46,7 @@ import type { MissingDoc } from './app/workspaces'
 import type { ContextMenuItem } from './components/ContextMenu'
 import type { DocsUpdate } from './app/useCollection'
 import type { Workspace, WorkspaceSnapshot } from './app/workspaces'
+import type { PageRef } from './app/types'
 
 const TOAST_MS = 4000
 
@@ -306,11 +307,35 @@ export function WorkspaceView({
   )
   const { handlePaste } = usePaste(collection, addFiles, setBusy, flash, onPastedPages)
 
+  // A Ctrl-dragged copy takes the page's marks and elements along.
+  const { copyPageInto: copyPageIntoDoc, copyPageToNewDoc: copyPageToDoc } = collection
+  const annotateCopy = useCallback(
+    (copyId: string | null, originId: string) => {
+      if (!copyId) return
+      const origins = new Map([[copyId, originId]])
+      copyMarksFrom(origins)
+      copyElementsFrom(origins)
+    },
+    [copyMarksFrom, copyElementsFrom]
+  )
+  const copyPageInto = useCallback(
+    (source: PageRef, docId: string, index: number) =>
+      annotateCopy(copyPageIntoDoc(source, docId, index), source.pageId),
+    [annotateCopy, copyPageIntoDoc]
+  )
+  const copyPageToNewDoc = useCallback(
+    (source: PageRef, docIndex: number) =>
+      annotateCopy(copyPageToDoc(source, docIndex), source.pageId),
+    [annotateCopy, copyPageToDoc]
+  )
+
   const drag = useDragController({
     layout,
     canvasRef,
     movePageInto: collection.movePageInto,
     movePageToNewDoc: collection.movePageToNewDoc,
+    copyPageInto,
+    copyPageToNewDoc,
     onExternalDrop: handleExternalDropFiles
   })
 

@@ -11,6 +11,8 @@ interface DragControllerDeps {
   canvasRef: React.RefObject<CanvasHandle | null>
   movePageInto: (source: PageRef, targetDocId: string, index: number) => void
   movePageToNewDoc: (source: PageRef, docIndex: number) => void
+  copyPageInto: (source: PageRef, targetDocId: string, index: number) => void
+  copyPageToNewDoc: (source: PageRef, docIndex: number) => void
   onExternalDrop: (files: IncomingFile[], target: DropTarget | null) => void
 }
 
@@ -21,6 +23,8 @@ export function useDragController(deps: DragControllerDeps) {
   const [collapsedId, setCollapsedId] = useState<string | null>(null)
   const [externalCount, setExternalCount] = useState(0)
   const [committing, setCommitting] = useState(false)
+  // A copy drag leaves the dragged page in place instead of collapsing it.
+  const [copying, setCopying] = useState(false)
   const dragDepth = useRef(0)
   const dragWatchdog = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -49,6 +53,7 @@ export function useDragController(deps: DragControllerDeps) {
     setDropTarget(null)
     setExternalCount(0)
     setCollapsedId(null)
+    setCopying(false)
   }, [])
 
   const armDragWatchdog = useCallback(() => {
@@ -87,7 +92,7 @@ export function useDragController(deps: DragControllerDeps) {
     dragKind,
     draggingPage,
     dropTarget,
-    collapsedId,
+    collapsedId: copying ? null : collapsedId,
     externalCount,
     dragDepth,
     setDragKind,
@@ -98,6 +103,9 @@ export function useDragController(deps: DragControllerDeps) {
     updateDropTarget,
     movePageInto: deps.movePageInto,
     movePageToNewDoc: deps.movePageToNewDoc,
+    copyPageInto: deps.copyPageInto,
+    copyPageToNewDoc: deps.copyPageToNewDoc,
+    setCopying,
     onExternalDrop: deps.onExternalDrop
   })
 
@@ -105,7 +113,7 @@ export function useDragController(deps: DragControllerDeps) {
     dragKind,
     draggingPage,
     dropTarget,
-    collapsedId,
+    collapsedId: copying ? null : collapsedId,
     externalCount,
     committing,
     startPageDrag,

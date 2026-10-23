@@ -8,6 +8,7 @@ import {
   splitDocAt,
   swapSource
 } from './selection-ops'
+import { copyPageInto, copyPageToNewDoc } from './move'
 import type { DocEntry, PageEntry, PdfSource } from '../../types'
 
 const source = { id: 'src' } as PdfSource
@@ -87,5 +88,24 @@ describe('swapSource', () => {
     const docs = [{ id: 'D', name: 'D', pages: [pg('p2', 2), pg('q', 0, other), pg('p0', 0)] }]
     const out = swapSource(docs, 'old', next, sizes(2))
     expect(out[0].pages.map((p) => p.id)).toEqual(['q', 'p0'])
+  })
+})
+
+describe('copy drag', () => {
+  const docs = [doc('A', 'a1', 'a2'), doc('B', 'b1')]
+
+  it('copies a page into a document and keeps the original', () => {
+    expect(ids(copyPageInto(docs, ref('A', 'a1'), 'c', 'B', 0))).toEqual(['A:a1,a2', 'B:c,b1'])
+    expect(ids(copyPageInto(docs, ref('A', 'a1'), 'c', 'A', 2))).toEqual(['A:a1,a2,c', 'B:b1'])
+  })
+
+  it('copies a page into a new document between others', () => {
+    const next = copyPageToNewDoc(docs, ref('B', 'b1'), 'c', 1, 'N')
+    expect(ids(next)).toEqual(['A:a1,a2', 'B (2):c', 'B:b1'])
+  })
+
+  it('ignores a missing page or target', () => {
+    expect(copyPageInto(docs, ref('A', 'x'), 'c', 'B', 0)).toBe(docs)
+    expect(copyPageInto(docs, ref('A', 'a1'), 'c', 'Z', 0)).toBe(docs)
   })
 })
