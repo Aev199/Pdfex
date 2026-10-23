@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { DocEntry } from '../../types'
 import type { View } from './geometry'
-import { clamp, GAP } from './geometry'
+import { clamp, pageAtScroll } from './geometry'
 
 interface EffectsOptions {
   scrollRef: React.RefObject<HTMLDivElement | null>
@@ -44,16 +44,8 @@ export function useFullViewEffects(opts: EffectsOptions): void {
       if (scrollRaf.current) return
       scrollRaf.current = requestAnimationFrame(() => {
         scrollRaf.current = null
-        const vp = vpRef.current
-        const ndi = clamp(Math.round(sc.scrollTop / (vp.h + GAP)), 0, docsRef.current.length - 1)
-        const docEl = sc.children[ndi] as HTMLElement | undefined
-        const npi = docEl
-          ? clamp(
-              Math.round(docEl.scrollLeft / (vp.w + GAP)),
-              0,
-              docsRef.current[ndi].pages.length - 1
-            )
-          : 0
+        const counts = docsRef.current.map((d) => d.pages.length)
+        const { di: ndi, pi: npi } = pageAtScroll(sc.scrollTop, vpRef.current.h, counts)
         setCurrent((c) => (c.di === ndi && c.pi === npi ? c : { di: ndi, pi: npi }))
       })
     }

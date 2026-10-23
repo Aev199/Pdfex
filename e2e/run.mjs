@@ -323,6 +323,17 @@ test('reader: thumbnails, page jump, rotation and printing', async () => {
     await page.keyboard.press('Enter')
     await page.waitForTimeout(1000)
     assert.equal(await page.locator('.full-count-input').inputValue(), '9')
+    // The wheel turns pages up and down, one per notch.
+    await page.mouse.move(640, 430)
+    for (const [delta, expected] of [
+      [100, '10'],
+      [100, '11'],
+      [-100, '10']
+    ]) {
+      await page.mouse.wheel(0, delta)
+      await page.waitForTimeout(700)
+      assert.equal(await page.locator('.full-count-input').inputValue(), expected)
+    }
     await page.locator('.full-actions .btn', { hasText: 'Print' }).click()
     await clickMenuItem(page, 'Print "')
     for (let i = 0; i < 60 && !(await app.evaluate(() => globalThis.__printed)); i++) {

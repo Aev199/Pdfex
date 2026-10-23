@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import type { DocEntry } from '../../types'
 import type { View } from './geometry'
 import {
@@ -8,7 +8,9 @@ import {
   flipTo,
   MAX_ZOOM,
   MIN_ZOOM,
-  TRANSITION_MS
+  TRANSITION_MS,
+  slideTop,
+  stepPage
 } from './geometry'
 
 interface ControlsOptions {
@@ -83,21 +85,23 @@ export function useFullViewControls(opts: ControlsOptions): FullViewControls {
     })
   }, [])
 
-  const navByKey = useCallback((axis: 'x' | 'y', dir: 1 | -1) => {
+  // Either axis turns the page: the reader is one vertical strip of pages,
+  // and the next page may be the first of the next document.
+  // Quick repeats (wheel notches, a held key) count from the page already
+  // on its way, not from the one still on screen, so each moves one more.
+  const turning = useRef<{ di: number; pi: number; at: number } | null>(null)
+  const navByKey = useCallback((_axis: 'x' | 'y', dir: 1 | -1) => {
     const sc = scrollRef.current
     if (!sc) return
-    const { di: cdi, pi: cpi } = curRef.current
-    if (axis === 'x') {
-      const docEl = sc.children[cdi] as HTMLElement | undefined
-      if (!docEl) return
-      const target = clamp(cpi + dir, 0, docsRef.current[cdi].pages.length - 1)
-      const slide = docEl.children[target] as HTMLElement | undefined
-      if (slide) docEl.scrollTo({ left: slide.offsetLeft, behavior: 'smooth' })
-    } else {
-      const target = clamp(cdi + dir, 0, docsRef.current.length - 1)
-      const docEl = sc.children[target] as HTMLElement | undefined
-      if (docEl) sc.scrollTo({ top: docEl.offsetTop, behavior: 'smooth' })
-    }
+    const now = performance.now()
+    const base =
+      turning.current && now - turning.current.at < 450 ? turning.current : curRef.current
+    const counts = docsRef.current.map((d) => d.pages.length)
+    const next = stepPage(counts, base.di, base.pi, dir)
+    const top = slideTop(sc, next.di, next.pi)
+    if (top === null) return
+    turning.current = { ...next, at: now }
+    sc.scrollTo({ top, behavior: 'smooth' })
   }, [])
 
   const runClose = useCallback(() => {
@@ -130,14 +134,11 @@ export function useFullViewControls(opts: ControlsOptions): FullViewControls {
     if (!sc) return
     const tdi = clamp(di, 0, docsRef.current.length - 1)
     const tpi = clamp(pi, 0, docsRef.current[tdi].pages.length - 1)
-    const docEl = sc.children[tdi] as HTMLElement | undefined
-    const slide = docEl?.children[tpi] as HTMLElement | undefined
-    if (!docEl || !slide) return
+    const top = slideTop(sc, tdi, tpi)
+    if (top === null) return
     setView({ zoom: 1, x: 0, y: 0 })
     const far = Math.abs(tpi - curRef.current.pi) > 3 || tdi !== curRef.current.di
-    const behavior = far ? 'auto' : 'smooth'
-    docEl.scrollTo({ left: slide.offsetLeft, behavior })
-    sc.scrollTo({ top: docEl.offsetTop, behavior })
+    sc.scrollTo({ top, behavior: far ? 'auto' : 'smooth' })
   }, [])
 
   return { resetView, applyZoom, panBy, navByKey, goTo, runClose }

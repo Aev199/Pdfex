@@ -129,7 +129,7 @@ export function FullViewChrome({
         className="full-nav prev"
         disabled={pi === 0}
         onClick={() => navByKey('x', -1)}
-        title="Previous page (←)"
+        title="Previous page (↑, wheel up)"
       >
         <ChevronLeftIcon size={18} />
       </button>
@@ -137,7 +137,7 @@ export function FullViewChrome({
         className="full-nav next"
         disabled={pi === pageCount - 1}
         onClick={() => navByKey('x', 1)}
-        title="Next page (→)"
+        title="Next page (↓, wheel down)"
       >
         <ChevronRightIcon size={18} />
       </button>
