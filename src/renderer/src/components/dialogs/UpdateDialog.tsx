@@ -51,24 +51,45 @@ export function UpdateDialog({
   const close = act('dismiss')
   const current = <p className="update-muted">This is version {version}.</p>
 
-  if (state.applied && state.phase.kind !== 'ready') {
+  if (state.applied) {
     const { ok, version: applied, message } = state.applied
+    const retry = !ok && state.phase.kind === 'ready'
     return (
       <Dialog
-        title={ok ? `PDFx ${applied}` : 'The update did not go through'}
+        title={ok ? `PDFx ${applied}` : `Version ${applied} was not installed`}
         onClose={close}
         footer={
-          <button className="btn primary" onClick={close}>
-            OK
-          </button>
+          retry ? (
+            <>
+              <button className="btn ghost" onClick={act('files')}>
+                Show update files
+              </button>
+              <button className="btn ghost" onClick={close}>
+                Close
+              </button>
+              <button className="btn primary" onClick={act('restart')}>
+                Try again
+              </button>
+            </>
+          ) : (
+            <button className="btn primary" onClick={close}>
+              OK
+            </button>
+          )
         }
       >
         {ok ? (
           <p>Version {applied} is installed. Tabs and documents are where you left them.</p>
         ) : (
           <>
-            <p>The previous version was kept and still works.</p>
+            <p>This version was kept and works as before.</p>
             {message && <p className="update-error">{message}</p>}
+            {retry && (
+              <p className="update-muted">
+                To install it by hand: close PDFx and copy everything from the update files folder
+                into the program folder, replacing the files there.
+              </p>
+            )}
           </>
         )}
       </Dialog>

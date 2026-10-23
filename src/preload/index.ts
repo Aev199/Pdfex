@@ -9,6 +9,7 @@ export type UpdateAction =
   | 'skip'
   | 'dismiss'
   | 'show'
+  | 'files'
   | 'restart'
   | 'rollback'
   | 'cancel'
