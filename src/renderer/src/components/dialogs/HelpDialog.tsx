@@ -39,6 +39,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       ['Wheel, ↑ ↓, ← →', 'Previous / next page (the next document follows)'],
       ['Home, End', 'First / last page of the document'],
       ['F4', 'Thumbnails and outline'],
+      ['F6', 'Comments'],
       ['Page number', 'Type a number and press Enter'],
       [`${MOD} + C`, 'Copy the selected text'],
       ['Esc', 'Back to the canvas']
@@ -85,8 +86,33 @@ function Guide(): React.JSX.Element {
       <h3>Annotations</h3>
       <p>
         In the reader press Edit: signature, text, highlight, redaction, pen, line, arrow,
-        rectangle, ellipse and eraser. Shift keeps lines at 45° and shapes square. Source PDFs are
-        never changed: annotations live in the session and go into a PDF only on export or print.
+        rectangle, ellipse, callout and eraser. Text takes a font, size, weight and colour (select
+        text you added to restyle it); highlights can be a colour, an underline or a strikethrough.
+        Shift keeps lines at 45° and shapes square. Source PDFs are never changed: annotations live
+        in the session and go into a PDF only on export or print.
+      </p>
+      <h3>Measuring drawings</h3>
+      <p>
+        The ruler tools measure a length, a polyline and an area: drag for a length; click the
+        points of a polyline or an area and double-click (or Enter) to finish, Backspace takes the
+        last point back. Pick the drawing scale (1:100…) and units, or press Calibrate and draw a
+        dimension whose real length you know. Labels are exported as text.
+      </p>
+      <h3>Comments</h3>
+      <p>
+        F6 or the speech-bubble button opens the comments of the document. New, then a click on the
+        page, pins a comment there; others can reply, edit, resolve or delete. Resolved comments
+        leave the page (Show resolved brings them back), and the eye hides all pins. Comments are
+        not part of the page: they are saved with the session and exported as PDF sticky notes with
+        their replies, which Acrobat and other viewers show as a conversation. Your name is set in
+        Settings.
+      </p>
+      <h3>Comparing revisions</h3>
+      <p>
+        Select two pages ({MOD} + click), right-click and choose Compare the 2 pages. The first page
+        in the canvas is the old revision: what was removed is red, what was added is blue, and what
+        both share is grey. 1, 2, 3 switch between the differences, the old and the new sheet; the
+        arrows nudge the new sheet when it was plotted with a shift; the wheel zooms.
       </p>
       <h3>Tabs and sessions</h3>
       <p>
@@ -98,7 +124,9 @@ function Guide(): React.JSX.Element {
       <h3>Search</h3>
       <p>
         {MOD} + F searches all documents of the tab. Scans are recognised on the computer the first
-        time you search; the language is chosen in the search bar or in Settings.
+        time you search; the language is chosen in the search bar or in Settings. Exported scans get
+        the recognised text as an invisible layer, so the PDF can be searched and copied in any
+        viewer (Settings → Search).
       </p>
       <h3>Updates</h3>
       <p>
