@@ -16,6 +16,8 @@ interface DocumentRowProps {
   selectedIds: ReadonlySet<string>
   pagesDraggable: boolean
   collapseId: string | null
+  // The page being dragged while it still stands in its place.
+  liftedId: string | null
   hiddenPageId: string | null
   marks: MarkMap
   formValues: FormValuesBySource
@@ -36,6 +38,7 @@ function DocumentRowImpl({
   selectedIds,
   pagesDraggable,
   collapseId,
+  liftedId,
   hiddenPageId,
   marks,
   formValues,
@@ -73,6 +76,7 @@ function DocumentRowImpl({
         renderVersion={renderVersion}
         selected={selectedIds.has(page.id)}
         collapsed={collapsed}
+        lifted={page.id === liftedId}
         hidden={page.id === hiddenPageId}
         dimmed={active && !docDimmed && !matchingPageIds.has(page.id)}
         highlightQuery={matches ? query : undefined}

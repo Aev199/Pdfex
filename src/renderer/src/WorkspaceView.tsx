@@ -671,6 +671,7 @@ export function WorkspaceView({
             draggingPage={drag.draggingPage}
             dropTarget={drag.dropTarget}
             collapsedId={drag.collapsedId}
+            liftedId={drag.liftedId}
             externalCount={drag.externalCount}
             canvasRef={canvasRef}
             initialView={initial.view}
