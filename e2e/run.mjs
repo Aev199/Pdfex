@@ -232,6 +232,16 @@ test('shapes drawn in the full view are exported as vector strokes', async () =>
     await page.locator('.full-actions .btn', { hasText: 'Done' }).click()
     await page.keyboard.press('Escape')
     await page.waitForTimeout(800)
+    // Copy the annotated page with its neighbour and paste both at the end:
+    // the copy keeps the shapes.
+    const canvasPages = page.locator('.canvas-world .page[data-page-id]')
+    await canvasPages.nth(0).click()
+    await canvasPages.nth(1).click({ modifiers: ['Control'] })
+    await page.keyboard.press('Control+c')
+    await canvasPages.nth(2).click()
+    await page.keyboard.press('Control+v')
+    await page.waitForTimeout(600)
+    assert.equal(await canvasPages.count(), 5)
     await mockSaveDialog(app, out)
     await menu(app, 'export-pdf')
     for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
@@ -239,11 +249,18 @@ test('shapes drawn in the full view are exported as vector strokes', async () =>
     await app.close()
   }
   const doc = await PDFDocument.load(readFileSync(out))
-  assert.equal(doc.getPageCount(), 3)
-  // The red stroke colour must be in the first page's content.
-  const contents = doc.getPage(0).node.Contents()
+  assert.equal(doc.getPageCount(), 5)
+  // The red stroke colour must be in the first page and in its pasted copy.
+  for (const index of [0, 3])
+    assert.match(pageContent(doc, index), /0\.898\d* 0\.196\d* 0\.176\d* RG/)
+  assert.doesNotMatch(pageContent(doc, 4), /0\.898\d* 0\.196\d* 0\.176\d* RG/)
+  assert.ok(statSync(out).size > 0)
+})
+
+function pageContent(doc, index) {
+  const contents = doc.getPage(index).node.Contents()
   const streams = contents?.asArray ? contents.asArray() : [contents]
-  const text = streams
+  return streams
     .map((ref) => doc.context.lookup(ref))
     .map((s) => {
       const raw = Buffer.from(s.getContents())
@@ -254,9 +271,7 @@ test('shapes drawn in the full view are exported as vector strokes', async () =>
       }
     })
     .join('\n')
-  assert.match(text, /0\.898\d* 0\.196\d* 0\.176\d* RG/)
-  assert.ok(statSync(out).size > 0)
-})
+}
 
 test('reader: thumbnails, page jump, rotation and printing', async () => {
   const { app, page } = await launch(freshData(), [files.report])

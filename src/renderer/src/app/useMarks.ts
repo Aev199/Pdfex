@@ -76,11 +76,13 @@ export function useMarks(pushUndo: (entry: UndoEntry) => void, initial: MarkMap 
   }, [])
 
   // Give duplicated pages (new id -> original id) the marks of their originals.
-  const copyToPages = useCallback((origins: Map<string, string>) => {
+  // `from` holds the originals' annotations when they come from elsewhere
+  // (pages pasted from another tab).
+  const copyToPages = useCallback((origins: Map<string, string>, from?: MarkMap) => {
     const map = marksRef.current
     let next: MarkMap | null = null
     for (const [copyId, originId] of origins) {
-      const marks = map[originId]
+      const marks = (from ?? map)[originId]
       if (!marks?.length) continue
       next ??= { ...map }
       next[copyId] = marks.map((m) => ({ ...m, id: crypto.randomUUID() }))

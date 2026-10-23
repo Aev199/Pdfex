@@ -35,6 +35,7 @@ import { StatusRibbon } from './components/StatusRibbon'
 import { useDocInfo } from './app/useDocInfo'
 import { useOpenWith } from './app/useOpenWith'
 import { usePrint } from './app/usePrint'
+import { clipboardAnnotations, rememberClipboardAnnotations } from './app/useClipboard'
 import { useContextMenu } from './app/context-menu'
 import { useSourceWatch } from './app/useSourceWatch'
 import { NoticeBar } from './components/NoticeBar'
@@ -286,7 +287,24 @@ export function WorkspaceView({
   )
   const openWith = useOpenWith(collection.docsRef, buildPagesPdf, hasEdits, setBusy, flash)
   const printPages = usePrint(buildPagesPdf, setBusy, flash)
-  const { handlePaste } = usePaste(collection, addFiles, setBusy, flash)
+  // Copied pages carry their marks and elements, also into another tab.
+  const { copyToPages: copyMarksFrom, marksRef } = markState
+  const { copyToPages: copyElementsFrom, elementsRef } = elementState
+  const { copySelected: copyPageRefs } = collection
+  const copyPages = useCallback(() => {
+    if (copyPageRefs().length > 0) {
+      rememberClipboardAnnotations(marksRef.current, elementsRef.current)
+    }
+  }, [copyPageRefs, marksRef, elementsRef])
+  const onPastedPages = useCallback(
+    (origins: Map<string, string>) => {
+      const clip = clipboardAnnotations()
+      copyMarksFrom(origins, clip.marks)
+      copyElementsFrom(origins, clip.elements)
+    },
+    [copyMarksFrom, copyElementsFrom]
+  )
+  const { handlePaste } = usePaste(collection, addFiles, setBusy, flash, onPastedPages)
 
   const drag = useDragController({
     layout,
@@ -380,7 +398,6 @@ export function WorkspaceView({
     selectionRef,
     ensureSelected,
     currentSelection,
-    copySelected,
     extractSelection,
     deleteSelection,
     splitDocAt,
@@ -429,6 +446,7 @@ export function WorkspaceView({
       if (count > 1) {
         openMenu(x, y, [
           { label: `Duplicate ${count} pages`, onClick: duplicateSelection },
+          { label: `Copy ${count} pages`, onClick: copyPages },
           { label: 'Rotate right', onClick: () => rotateSelection(90) },
           { label: 'Rotate left', onClick: () => rotateSelection(-90) },
           { label: `Extract ${count} pages to a new document`, onClick: extractSelection },
@@ -444,7 +462,7 @@ export function WorkspaceView({
         { label: 'Duplicate page', onClick: duplicateSelection },
         { label: 'Rotate right', onClick: () => rotateSelection(90) },
         { label: 'Rotate left', onClick: () => rotateSelection(-90) },
-        { label: 'Copy page', onClick: copySelected },
+        { label: 'Copy page', onClick: copyPages },
         { label: 'Split document here', onClick: () => splitDocAt(docId, pageId) },
         { label: 'Extract to a new document', onClick: extractSelection },
         { label: 'Export page as PDF…', onClick: exportSelection },
@@ -463,7 +481,7 @@ export function WorkspaceView({
       extractSelection,
       exportSelection,
       deleteSelection,
-      copySelected,
+      copyPages,
       splitDocAt,
       openWithSubmenu,
       revealItem,
@@ -506,7 +524,7 @@ export function WorkspaceView({
     onDeleteSelection: collection.deleteSelection,
     onDuplicate: duplicateSelection,
     onSelectAll: collection.selectAll,
-    onCopy: collection.copySelected,
+    onCopy: copyPages,
     onPaste,
     onUndo,
     onRedo,
@@ -561,6 +579,12 @@ export function WorkspaceView({
   const totalPages = docs.reduce((sum, d) => sum + d.pages.length, 0)
   const { fullView } = fullViewState
   const fullViewDoc = fullView ? docs.find((d) => d.id === fullView.docId) : undefined
+  // Its document went away (undo, removal): close for good, or redo would
+  // bring the reader back unasked.
+  const { closeFullView } = fullViewState
+  useEffect(() => {
+    if (fullView && !fullViewDoc) closeFullView()
+  }, [fullView, fullViewDoc, closeFullView])
 
   return (
     <FindProvider value={findState}>

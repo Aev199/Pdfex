@@ -1,5 +1,5 @@
 import { ACTIONS } from './undo'
-import { clipboardSourceId } from './useClipboard'
+import { clipboardSourceIds } from './useClipboard'
 import type { WorkspaceSnapshot } from './workspaces'
 import type { DocEntry } from '../types'
 
@@ -22,7 +22,6 @@ export function liveSourceIds(snapshots: WorkspaceSnapshot[]): Set<string> {
       }
     }
   }
-  const clip = clipboardSourceId()
-  if (clip) live.add(clip)
+  for (const id of clipboardSourceIds()) live.add(id)
   return live
 }

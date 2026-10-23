@@ -10,7 +10,9 @@ export function usePaste(
   collection: Collection,
   addFiles: (files: IncomingFile[]) => Promise<void>,
   setBusy: (busy: boolean) => void,
-  flash: (message: string) => void
+  flash: (message: string) => void,
+  // Copied pages were pasted: new page id -> copied page id.
+  onPastedPages: (origins: Map<string, string>) => void
 ) {
   const { docs, selected, setDocs, insertPagesAfter, pasteAfterSelected } = collection
 
@@ -71,8 +73,9 @@ export function usePaste(
       await pasteImage(png)
       return
     }
-    pasteAfterSelected()
-  }, [pasteFiles, pasteImage, pasteAfterSelected])
+    const origins = pasteAfterSelected()
+    if (origins.size > 0) onPastedPages(origins)
+  }, [pasteFiles, pasteImage, pasteAfterSelected, onPastedPages])
 
   return { handlePaste }
 }

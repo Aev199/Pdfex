@@ -5,6 +5,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
+import { pathToFileURL } from 'url'
 import { queryAppPath } from './open-with'
 
 // Office documents → PDF with what the user already has installed: Microsoft
@@ -209,7 +210,9 @@ async function viaLibreOffice(input: string, dir: string, id: string): Promise<U
     await execFileAsync(
       soffice,
       [
-        `-env:UserInstallation=file:///${profile.replace(/\\/g, '/')}`,
+        // A proper file URL: a Cyrillic user name in the temp path must be
+        // percent-encoded or LibreOffice can't start.
+        `-env:UserInstallation=${pathToFileURL(profile).href}`,
         '--headless',
         '--norestore',
         '--convert-to',
@@ -218,7 +221,13 @@ async function viaLibreOffice(input: string, dir: string, id: string): Promise<U
         outDir,
         input
       ],
-      { timeout: CONVERT_TIMEOUT_MS, windowsHide: true }
+      {
+        timeout: CONVERT_TIMEOUT_MS,
+        windowsHide: true,
+        // Without a UTF-8 locale LibreOffice on Linux can't map non-ASCII
+        // paths; Windows uses Unicode APIs and ignores it.
+        env: { ...process.env, LANG: process.env.LANG || 'C.UTF-8' }
+      }
     )
     const [pdf] = (await readdir(outDir)).filter((f) => f.toLowerCase().endsWith('.pdf'))
     if (!pdf) throw new Error('office-convert: LibreOffice produced no PDF')

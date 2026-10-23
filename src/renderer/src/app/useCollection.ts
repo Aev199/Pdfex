@@ -79,13 +79,6 @@ export function useCollection(
     setSelection(next ? [next] : [])
   }, [])
 
-  const { copySelected, pasteAfterSelected } = useClipboard(
-    docs,
-    selected,
-    setDocs,
-    setSelected,
-    flash
-  )
 
   const selectPage = useCallback(
     (docId: string, pageId: string, modifiers?: SelectModifiers) => {
@@ -136,6 +129,15 @@ export function useCollection(
     const ids = new Set(selectionRef.current.map((r) => r.pageId))
     return selOps.allPages(docsRef.current).filter((r) => ids.has(r.pageId))
   }, [])
+
+  const { copySelected, pasteAfterSelected } = useClipboard(
+    docs,
+    selected,
+    currentSelection,
+    setDocs,
+    setSelected,
+    flash
+  )
 
   const removeDoc = useCallback(
     (id: string) => {

@@ -202,11 +202,13 @@ export function useElements(
   )
 
   // Give duplicated pages (new id -> original id) the elements of their originals.
-  const copyToPages = useCallback((origins: Map<string, string>) => {
+  // `from` holds the originals' annotations when they come from elsewhere
+  // (pages pasted from another tab).
+  const copyToPages = useCallback((origins: Map<string, string>, from?: ElementMap) => {
     const map = elementsRef.current
     let next: ElementMap | null = null
     for (const [copyId, originId] of origins) {
-      const list = map[originId]
+      const list = (from ?? map)[originId]
       if (!list?.length) continue
       next ??= { ...map }
       next[copyId] = list.map((e) => ({ ...e, id: crypto.randomUUID() }))

@@ -38,7 +38,11 @@ if (!gotLock) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
     }
-    void sendOpenPaths(collectFileArgs(argv.slice(1), workingDirectory))
+    const paths = collectFileArgs(argv.slice(1), workingDirectory)
+    // Until the window has restored its session and listens, keep them for
+    // the renderer-ready handshake rather than sending into the void.
+    if (getRendererReady()) void sendOpenPaths(paths)
+    else pendingOpenPaths.push(...paths)
   })
 
   app.whenReady().then(() => {
