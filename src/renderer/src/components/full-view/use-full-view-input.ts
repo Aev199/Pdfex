@@ -94,6 +94,14 @@ export function useFullViewInput(opts: InputOptions): void {
       if (editingRef.current && Math.abs(event.deltaY) >= Math.abs(event.deltaX)) {
         event.preventDefault()
         panBy(0, -event.deltaY)
+        return
+      }
+      // A mouse wheel notch turns one page, up or down (sideways with
+      // Shift). A touchpad scrolls the strip natively and settles on a page.
+      if (intent.smooth) {
+        event.preventDefault()
+        const delta = Math.abs(intent.dy) >= Math.abs(intent.dx) ? intent.dy : intent.dx
+        if (delta !== 0) navByKey('y', delta > 0 ? 1 : -1)
       }
     }
     sc.addEventListener('wheel', onWheel, { passive: false })
@@ -101,5 +109,5 @@ export function useFullViewInput(opts: InputOptions): void {
       sc.removeEventListener('wheel', onWheel)
       animator.stop()
     }
-  }, [applyZoom, panBy])
+  }, [applyZoom, panBy, navByKey])
 }

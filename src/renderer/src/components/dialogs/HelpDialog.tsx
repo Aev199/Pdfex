@@ -36,7 +36,8 @@ const SHORTCUTS: [string, [string, string][]][] = [
   [
     'Reader',
     [
-      ['← →, Home, End', 'Previous, next, first, last page'],
+      ['Wheel, ↑ ↓, ← →', 'Previous / next page (the next document follows)'],
+      ['Home, End', 'First / last page of the document'],
       ['F4', 'Thumbnails and outline'],
       ['Page number', 'Type a number and press Enter'],
       [`${MOD} + C`, 'Copy the selected text'],
@@ -76,9 +77,10 @@ function Guide(): React.JSX.Element {
       </p>
       <h3>Reading</h3>
       <p>
-        Double-click a page to read it full screen. F4 shows thumbnails or the outline, links work,
-        text can be selected and copied. Large drawings are redrawn sharply after zooming, up to
-        9000%.
+        Double-click a page to read it full screen. Pages follow each other top to bottom: the mouse
+        wheel turns one page per notch, a touchpad scrolls. F4 shows thumbnails or the outline,
+        links work, text can be selected and copied. Large drawings are redrawn sharply after
+        zooming, up to 9000%.
       </p>
       <h3>Annotations</h3>
       <p>

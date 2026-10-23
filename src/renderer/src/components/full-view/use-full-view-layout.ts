@@ -1,6 +1,6 @@
 import { useLayoutEffect } from 'react'
 import type { Rect } from './geometry'
-import { TRANSITION_MS } from './geometry'
+import { slideTop, TRANSITION_MS } from './geometry'
 
 interface LayoutOptions {
   scrollRef: React.RefObject<HTMLDivElement | null>
@@ -21,11 +21,8 @@ export function useFullViewLayout(opts: LayoutOptions): void {
   useLayoutEffect(() => {
     const sc = scrollRef.current
     if (!sc) return
-    const docEl = sc.children[curRef.current.di] as HTMLElement | undefined
-    if (!docEl) return
-    sc.scrollTop = docEl.offsetTop
-    const slide = docEl.children[curRef.current.pi] as HTMLElement | undefined
-    if (slide) docEl.scrollLeft = slide.offsetLeft
+    const top = slideTop(sc, curRef.current.di, curRef.current.pi)
+    if (top !== null) sc.scrollTop = top
   }, [vw, vh])
 
   useLayoutEffect(() => {

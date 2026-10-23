@@ -65,7 +65,9 @@ function DocLayerImpl(props: DocLayerProps): React.JSX.Element {
               doc={doc}
               pageHeight={BASE_PAGE_HEIGHT}
               renderVersion={props.renderVersion}
-              selectedIds={doc.pages.some((p) => props.selectedIds.has(p.id)) ? props.selectedIds : NO_PAGES}
+              selectedIds={
+                doc.pages.some((p) => props.selectedIds.has(p.id)) ? props.selectedIds : NO_PAGES
+              }
               pagesDraggable={props.pagesDraggable}
               collapseId={
                 props.collapsedId && props.draggingPage?.docId === doc.id ? props.collapsedId : null

@@ -1226,3 +1226,28 @@
   cursor: pointer;
   white-space: nowrap;
 }
+
+/* Reader: one vertical strip of pages, as in other PDF readers. The mouse
+   wheel snaps page by page, a touchpad scrolls freely and settles on a page,
+   and the next document follows the last page of the previous one. */
+.full-scroll {
+  container-type: size;
+}
+
+.full-doc {
+  height: auto;
+  flex-direction: column;
+  gap: 24px;
+  overflow: visible;
+  scroll-snap-type: none;
+  scroll-snap-align: none;
+}
+
+.full-scroll.locked .full-doc {
+  overflow: visible;
+}
+
+.full-slide {
+  flex: 0 0 auto;
+  height: 100cqh;
+}
