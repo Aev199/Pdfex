@@ -1,6 +1,8 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { Mark } from '../edit/types'
 import type { PageElement } from '../elements/types'
+import type { CommentThread } from '../comments/types'
+import type { OcrWord } from '../ocr/types'
 
 export { buildPdf, buildPdfx } from './build'
 
@@ -30,6 +32,9 @@ export interface SourceExportPage {
   pageIndex: number
   marks?: Mark[]
   elements?: PageElement[]
+  comments?: CommentThread[]
+  // Text recognized on a scanned page, laid under it invisibly.
+  ocrWords?: OcrWord[]
   // Extra clockwise turn chosen in PDFx (0, 90, 180, 270).
   rotation?: number
 }
@@ -40,6 +45,7 @@ export interface RasterExportPage {
   width: number
   height: number
   elements?: PageElement[]
+  comments?: CommentThread[]
   rotation?: number
 }
 

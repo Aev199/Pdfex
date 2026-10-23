@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, PDFName, rgb } from 'pdf-lib'
 import { inflateSync } from 'node:zlib'
 import { createHash } from 'node:crypto'
 import { strToU8, zipSync } from 'fflate'
@@ -290,6 +290,325 @@ function pageContent(doc, index) {
     })
     .join('\n')
 }
+
+test('styled text and an underline are exported with their fonts and colours', async () => {
+  const { app, page } = await launch(freshData(), [files.second])
+  const out = join(work, 'styled.pdf')
+  try {
+    await rendered(page)
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    await page.locator('.full-actions .btn', { hasText: 'Edit' }).click()
+    await page.locator('.full-actions .btn', { hasText: 'Add Text' }).click()
+    await page.locator('.annotate-select[title="Font"]').selectOption('serif')
+    await page.locator('.annotate-tool[title="Bold"]').click()
+    await page.locator('.annotate-swatch').nth(1).click() // red
+    const fp = await page.locator('.full-page').first().boundingBox()
+    const at = (fx, fy) => [fp.x + fp.width * fx, fp.y + fp.height * fy]
+    await page.mouse.click(...at(0.3, 0.5))
+    await page.keyboard.type('Проверка')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+    assert.ok((await page.locator('.full-page text[font-weight="bold"]').count()) >= 1)
+    await page.locator('.full-actions .btn', { hasText: 'Highlight' }).click()
+    await page.locator('.annotate-tool[title="Underline"]').click()
+    await page.locator('.annotate-swatch[title="green"]').click()
+    await page.waitForSelector('.full-page .edit-select-layer span')
+    await page.waitForTimeout(500)
+    // A line below the annotation bar.
+    const line = await page.locator('.full-page .edit-select-layer span').nth(6).boundingBox()
+    await page.mouse.move(line.x + 2, line.y + line.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(line.x + line.width - 2, line.y + line.height / 2, { steps: 8 })
+    await page.mouse.up()
+    await page.waitForTimeout(300)
+    assert.ok((await page.locator('.mark-rect.line').count()) > 0)
+    await page.locator('.full-actions .btn', { hasText: 'Done' }).click()
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await mockSaveDialog(app, out)
+    await menu(app, 'export-pdf')
+    for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
+  } finally {
+    await app.close()
+  }
+  const doc = await PDFDocument.load(readFileSync(out))
+  const fonts = doc.context
+    .enumerateIndirectObjects()
+    .map(([, obj]) => obj?.get?.(PDFName.of('BaseFont'))?.toString() ?? '')
+    .filter(Boolean)
+  assert.ok(
+    fonts.some((f) => f.includes('DejaVuSerif-Bold')),
+    fonts.join(' ')
+  )
+  assert.match(pageContent(doc, 0), /0\.49\d* 0\.86\d* 0\.52\d* rg/)
+})
+
+test('measurements and callouts are labelled and exported as real text', async () => {
+  const { app, page } = await launch(freshData(), [files.second])
+  const out = join(work, 'measured.pdf')
+  try {
+    await rendered(page)
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    await page.locator('.full-actions .btn', { hasText: 'Edit' }).click()
+    const fp = await page.locator('.full-page').first().boundingBox()
+    const at = (fx, fy) => [fp.x + fp.width * fx, fp.y + fp.height * fy]
+
+    await page.locator('.annotate-tool[title="Measure length"]').click()
+    await page.locator('.annotate-select[title="Drawing scale"]').selectOption('1:100')
+    await page.locator('.annotate-select[title="Units"]').selectOption('m')
+    await page.mouse.move(...at(0.2, 0.6))
+    await page.mouse.down()
+    await page.mouse.move(...at(0.6, 0.6), { steps: 6 })
+    await page.mouse.up()
+    // 40% of an A4 width (238 pt = 84 mm) at 1:100 is 8.4 m.
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('.measure-label text')].some((t) =>
+        /^8,4\d? м$/.test(t.textContent ?? '')
+      )
+    )
+
+    await page.locator('.annotate-tool[title^="Measure an area"]').click()
+    await page.mouse.click(...at(0.2, 0.7))
+    await page.mouse.click(...at(0.5, 0.7))
+    await page.mouse.dblclick(...at(0.5, 0.8))
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('.measure-label text')].some((t) =>
+        (t.textContent ?? '').endsWith('м²')
+      )
+    )
+
+    await page.locator('.annotate-tool[title^="Callout"]').click()
+    await page.mouse.move(...at(0.4, 0.88))
+    await page.mouse.down()
+    await page.mouse.move(...at(0.6, 0.82), { steps: 6 })
+    await page.mouse.up()
+    await page.keyboard.type('Узел 1')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+
+    await page.locator('.full-actions .btn', { hasText: 'Done' }).click()
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await mockSaveDialog(app, out)
+    await menu(app, 'export-pdf')
+    for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
+  } finally {
+    await app.close()
+  }
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(out)) }).promise
+  const content = await (await doc.getPage(1)).getTextContent()
+  const text = content.items.map((item) => item.str).join(' ')
+  assert.match(text, /8,4\d? м/)
+  assert.match(text, /м²/)
+  assert.match(text, /Узел 1/)
+})
+
+test('comments: reply, resolve, survive a restart and export as PDF notes', async () => {
+  const data = freshData()
+  const out = join(work, 'commented.pdf')
+  let run = await launch(data, [files.second])
+  try {
+    const { page } = run
+    await rendered(page)
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    if (!(await page.locator('.comments-panel').count())) await page.keyboard.press('F6')
+    const fp = await page.locator('.full-page').first().boundingBox()
+    const at = (fx, fy) => [fp.x + fp.width * fx, fp.y + fp.height * fy]
+
+    await page.locator('.comments-new').click()
+    await page.mouse.click(...at(0.3, 0.3))
+    await page.keyboard.type('Check the dimension')
+    await page.keyboard.press('Enter')
+    await page.locator('.comment-reply-btn').first().click()
+    await page.keyboard.type('Fixed in rev. B')
+    await page.keyboard.press('Enter')
+
+    await page.locator('.comments-new').click()
+    await page.mouse.click(...at(0.6, 0.7))
+    await page.keyboard.type('Second note')
+    await page.keyboard.press('Enter')
+    assert.deepEqual(await texts(page, '.comment-pin'), ['1', '2'])
+    await page
+      .locator('.comment-card', { hasText: 'Second note' })
+      .locator('.comment-resolve')
+      .click()
+    // Resolved threads leave the page and the list until asked for.
+    assert.deepEqual(await texts(page, '.comment-pin'), ['1'])
+    assert.equal(await page.locator('.comment-card').count(), 1)
+    await page.locator('.comments-filter input').check()
+    assert.equal(await page.locator('.comment-card.resolved').count(), 1)
+    await page.locator('.comments-panel .comments-icon-btn[title^="Hide"]').click()
+    assert.equal(await page.locator('.comment-pin').count(), 0)
+
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    assert.equal(await page.locator('.page-comments').first().textContent(), '1')
+    await page.waitForTimeout(2000)
+  } finally {
+    await run.app.close()
+  }
+
+  run = await launch(data)
+  try {
+    const { app, page } = run
+    await rendered(page)
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    if (!(await page.locator('.comments-panel').count())) await page.keyboard.press('F6')
+    await page.locator('.comments-filter input').check()
+    assert.equal(await page.locator('.comment-card').count(), 2)
+    assert.match(await page.locator('.comment-card').first().textContent(), /Fixed in rev\. B/)
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await mockSaveDialog(app, out)
+    await menu(app, 'export-pdf')
+    for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
+  } finally {
+    await run.app.close()
+  }
+
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(out)) }).promise
+  const notes = (await (await doc.getPage(1)).getAnnotations()).filter((a) => a.subtype === 'Text')
+  const byText = (text) => notes.find((n) => n.contentsObj?.str === text)
+  const first = byText('Check the dimension')
+  assert.ok(first && !first.inReplyTo)
+  assert.equal(byText('Fixed in rev. B')?.inReplyTo, first.id)
+  const second = byText('Second note')
+  assert.ok(second)
+  assert.ok(notes.some((n) => n.inReplyTo === second.id && /Completed/.test(n.contentsObj?.str)))
+  // Nothing was drawn: the page text is the source's own.
+  const content = await (await doc.getPage(1)).getTextContent()
+  assert.doesNotMatch(content.items.map((i) => i.str).join(' '), /Check the dimension/)
+})
+
+test('an exported scan gets its recognized text as an invisible layer', async () => {
+  const scan = join(work, 'Скан акта.pdf')
+  const out = join(work, 'scan-searchable.pdf')
+  // A page that is only a picture of text, drawn by the app's own Chromium.
+  let run = await launch(freshData(), [])
+  let png
+  try {
+    png = await run.page.evaluate(() => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 1240
+      canvas.height = 1754
+      const g = canvas.getContext('2d')
+      g.fillStyle = '#fff'
+      g.fillRect(0, 0, canvas.width, canvas.height)
+      g.fillStyle = '#000'
+      g.font = '56px Arial, sans-serif'
+      g.fillText('Скважина 17 глубина', 120, 300)
+      g.fillText('Protocol 2024', 120, 420)
+      return canvas.toDataURL('image/png').split(',')[1]
+    })
+  } finally {
+    await run.app.close()
+  }
+  const doc = await PDFDocument.create()
+  const image = await doc.embedPng(Buffer.from(png, 'base64'))
+  doc.addPage([595, 842]).drawImage(image, { x: 0, y: 0, width: 595, height: 842 })
+  writeFileSync(scan, await doc.save())
+
+  run = await launch(freshData(), [scan])
+  try {
+    await rendered(run.page)
+    await mockSaveDialog(run.app, out)
+    await menu(run.app, 'export-pdf')
+    for (let i = 0; i < 300 && !existsSync(out); i++) await run.page.waitForTimeout(200)
+  } finally {
+    await run.app.close()
+  }
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const result = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(out)) }).promise
+  const content = await (await result.getPage(1)).getTextContent()
+  const text = content.items.map((item) => item.str).join(' ')
+  assert.match(text, /Скважина/)
+  assert.match(text, /Protocol/)
+  // The words lie where they were read: "Скважина" starts near the left edge,
+  // a third of the way down the scan.
+  const word = content.items.find((item) => item.str.includes('Скважина'))
+  assert.ok(Math.abs(word.transform[4] - 54) < 12, `x ${word.transform[4]}`)
+  assert.ok(Math.abs(word.transform[5] - (842 - 143)) < 20, `y ${word.transform[5]}`)
+})
+
+test('two revisions of a sheet are compared: removed red, added blue', async () => {
+  const revA = join(work, 'КЖ лист 2 изм.0.pdf')
+  const revB = join(work, 'КЖ лист 2 изм.1.pdf')
+  for (const [file, x] of [
+    [revA, 200],
+    [revB, 400]
+  ]) {
+    const doc = await PDFDocument.create()
+    const sheet = doc.addPage([842, 595])
+    sheet.drawRectangle({
+      x: 30,
+      y: 30,
+      width: 782,
+      height: 535,
+      borderWidth: 2,
+      borderColor: rgb(0, 0, 0)
+    })
+    // The beam moved between the revisions.
+    sheet.drawRectangle({ x, y: 250, width: 120, height: 40, color: rgb(0, 0, 0) })
+    writeFileSync(file, await doc.save())
+  }
+  const { page, app } = await launch(freshData(), [revA, revB])
+  try {
+    await rendered(page)
+    const pages = page.locator('.canvas-world .page[data-page-id]')
+    await pages.nth(0).click()
+    await pages.nth(1).click({ modifiers: ['Control'] })
+    await pages.nth(1).click({ button: 'right' })
+    await clickMenuItem(page, 'Compare the 2 pages')
+    await page.waitForFunction(
+      () => document.querySelector('.compare-stats')?.textContent === 'Changes found',
+      null,
+      { timeout: 20000 }
+    )
+    assert.match(await page.locator('.compare-name.older').textContent(), /изм\.0/)
+    // Sample the overlay: the old beam's place is red, the new one's blue,
+    // the frame both share is grey.
+    const colours = await page.evaluate(() => {
+      const canvas = document.querySelector('.compare-canvas')
+      const ctx = canvas.getContext('2d')
+      const at = (x, y) =>
+        [
+          ...ctx.getImageData(Math.round(canvas.width * x), Math.round(canvas.height * y), 1, 1)
+            .data
+        ].slice(0, 3)
+      return {
+        removed: at(260 / 842, 1 - 270 / 595),
+        added: at(460 / 842, 1 - 270 / 595),
+        frame: at(0.5, 1 - 30 / 595)
+      }
+    })
+    const [r1, g1, b1] = colours.removed
+    assert.ok(r1 > 200 && g1 < 80 && b1 < 80, `removed ${colours.removed}`)
+    const [r2, , b2] = colours.added
+    assert.ok(b2 > 200 && r2 < 80, `added ${colours.added}`)
+    const [r3, g3, b3] = colours.frame
+    assert.ok(r3 === g3 && g3 === b3 && r3 < 200, `frame ${colours.frame}`)
+
+    // Arrows shift the new sheet; Reset puts it back.
+    await page.keyboard.press('Shift+ArrowRight')
+    assert.match(await page.locator('.compare-nudge').textContent(), /offset 10, 0 px/)
+    await page.locator('.compare-nudge button', { hasText: 'Reset' }).click()
+    await page.locator('.compare-view button[title="Swap old and new"]').click()
+    await page.waitForFunction(() =>
+      /изм\.1/.test(document.querySelector('.compare-name.older')?.textContent ?? '')
+    )
+    await page.keyboard.press('Escape')
+    assert.equal(await page.locator('.compare-view').count(), 0)
+    assert.equal(await page.locator('.canvas-world .page[data-page-id]').count(), 2)
+  } finally {
+    await app.close()
+  }
+})
 
 test('reader: thumbnails, page jump, rotation and printing', async () => {
   const { app, page } = await launch(freshData(), [files.report])

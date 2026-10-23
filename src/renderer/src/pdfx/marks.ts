@@ -1,6 +1,6 @@
 import { BlendMode, rgb } from 'pdf-lib'
 import type { PDFPage, RGB } from 'pdf-lib'
-import { MARK_COLORS } from '../edit/types'
+import { MARK_COLORS, markBand } from '../edit/types'
 import type { Mark } from '../edit/types'
 import { normalizeRotation, visualRectToUser } from './redact/geometry'
 
@@ -15,15 +15,16 @@ export function drawMarks(page: PDFPage, marks: Mark[] | undefined): void {
   const rot = normalizeRotation(page.getRotation().angle)
   for (const mark of marks) {
     const color = hexColor(MARK_COLORS[mark.color])
-    for (const r of mark.rects) {
-      const user = visualRectToUser(r, box, rot)
+    const line = !!mark.style && mark.style !== 'fill'
+    for (const rect of mark.rects) {
+      const user = visualRectToUser(markBand(mark.style, rect), box, rot)
       page.drawRectangle({
         x: user.x,
         y: user.y,
         width: user.w,
         height: user.h,
         color,
-        blendMode: mark.kind === 'highlight' ? BlendMode.Multiply : BlendMode.Normal
+        blendMode: mark.kind === 'highlight' && !line ? BlendMode.Multiply : BlendMode.Normal
       })
     }
   }

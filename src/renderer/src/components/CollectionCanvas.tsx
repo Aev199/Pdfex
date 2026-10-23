@@ -13,6 +13,7 @@ import type { DocEntry } from '../types'
 import type { MarkMap } from '../edit/types'
 import type { FormValuesBySource } from '../forms/types'
 import type { ElementMap } from '../elements/types'
+import type { CommentMap } from '../comments/types'
 import type { CanvasView } from '../app/workspaces'
 import type { SelectModifiers } from '../app/useCollection'
 
@@ -28,6 +29,7 @@ interface CollectionCanvasProps {
   marks: MarkMap
   formValues: FormValuesBySource
   elements: ElementMap
+  comments: CommentMap
   dragKind: 'internal' | 'external' | null
   draggingPage: PageRef | null
   dropTarget: DropTarget | null
@@ -120,6 +122,7 @@ export function CollectionCanvas(props: CollectionCanvasProps): React.JSX.Elemen
         marks={props.marks}
         formValues={props.formValues}
         elements={props.elements}
+        comments={props.comments}
         intoDocId={intoDocId}
         intoIndex={intoIndex}
         intoGhostWidth={ghostSize.width}

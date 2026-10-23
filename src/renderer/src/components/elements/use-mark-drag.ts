@@ -4,6 +4,7 @@ import type { TextElement } from '../../elements/types'
 import { lineSpanAt, lineSpans, wordSpanAt } from '../../elements/text-marks'
 import type { TextSpan } from '../../elements/text-marks'
 import { nearestCharOffset } from '../../elements/measure'
+import { lookOf } from '../../elements/types'
 
 interface MarkDragState {
   element: TextElement
@@ -44,7 +45,7 @@ export function useMarkDrag(
     )
     const line = lines[row]
     const local = px - element.origin.x * naturalWidth
-    return line.start + nearestCharOffset(line.text, element.fontSize, local)
+    return line.start + nearestCharOffset(line.text, element.fontSize, local, lookOf(element))
   }
   const charAtRef = useRef(charAt)
   charAtRef.current = charAt

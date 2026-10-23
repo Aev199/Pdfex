@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { MarkKind } from '../../edit/types'
-import type { PageElement, TextElement } from '../../elements/types'
+import type { CalloutElement, PageElement, TextElement } from '../../elements/types'
 import type { TextSpan } from '../../elements/text-marks'
 import { ElementNode } from './ElementNode'
 import { ElementDecorations } from './ElementDecorations'
@@ -53,7 +53,12 @@ export function ElementsLayer({
   )
   if (elements.length === 0) return null
 
-  const editing = editingId ? textElements(elements).find((e) => e.id === editingId) : undefined
+  const editing = editingId
+    ? elements.find(
+        (e): e is TextElement | CalloutElement =>
+          e.id === editingId && (e.kind === 'text' || e.kind === 'callout')
+      )
+    : undefined
   const visible = editing ? elements.filter((e) => e.id !== editing.id) : elements
   const activeId = interactive ? (selectedId ?? hoveredId) : null
   const active = activeId ? visible.find((e) => e.id === activeId) : undefined

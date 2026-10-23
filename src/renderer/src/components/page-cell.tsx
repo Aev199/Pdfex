@@ -10,6 +10,7 @@ import { pageDisplayWidth } from '../canvas/layout'
 import { PageView } from './PageView'
 import { MarkLayer } from './MarkLayer'
 import { ElementsLayer } from './elements/ElementsLayer'
+import { CommentIcon } from './icons'
 import { FormLayer } from './forms/FormLayer'
 import { buildPageDragImage } from './page-drag-image'
 import { PageRotor, naturalSize } from './PageRotor'
@@ -30,6 +31,8 @@ interface PageCellProps {
   marks: Mark[] | undefined
   formValues: FormValues | undefined
   elements: PageElement[] | undefined
+  // Open review comments on the page.
+  commentCount: number
   pagesDraggable: boolean
   visibleNumber: number
   onSelectPage: (docId: string, pageId: string, modifiers?: SelectModifiers) => void
@@ -54,6 +57,7 @@ function PageCellImpl({
   marks,
   formValues,
   elements,
+  commentCount,
   pagesDraggable,
   visibleNumber,
   onSelectPage,
@@ -154,6 +158,15 @@ function PageCellImpl({
       {aiActive && <div className="ai-glow" />}
       {aiFlash && <div className="ai-flash" />}
       <span className="page-number">{visibleNumber}</span>
+      {commentCount > 0 && (
+        <span
+          className="page-comments"
+          title={`${commentCount} open comment${commentCount === 1 ? '' : 's'}`}
+        >
+          <CommentIcon size={11} />
+          {commentCount}
+        </span>
+      )}
     </div>
   )
 }

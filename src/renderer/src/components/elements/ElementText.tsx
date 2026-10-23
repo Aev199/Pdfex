@@ -1,4 +1,4 @@
-import { TEXT_BASELINE, TEXT_FONT_FAMILY, TEXT_LINE_HEIGHT } from '../../elements/types'
+import { TEXT_BASELINE, TEXT_FONT_FAMILIES, TEXT_LINE_HEIGHT, lookOf } from '../../elements/types'
 import type { TextElement } from '../../elements/types'
 import { lineSpans } from '../../elements/text-marks'
 import type { TextSpan } from '../../elements/text-marks'
@@ -40,6 +40,9 @@ export function ElementText({
   onMarkDragStart,
   onEdit
 }: ElementTextProps): React.JSX.Element {
+  const look = lookOf(element)
+  const fontFamily = TEXT_FONT_FAMILIES[look.font]
+  const fontWeight = look.bold ? 'bold' : undefined
   const lineHeight = element.fontSize * TEXT_LINE_HEIGHT
   const originX = element.origin.x * width
   const originY = element.origin.y * height
@@ -65,7 +68,8 @@ export function ElementText({
         <text
           className="element-outline"
           fontSize={element.fontSize}
-          fontFamily={TEXT_FONT_FAMILY}
+          fontFamily={fontFamily}
+          fontWeight={fontWeight}
           fill="none"
           strokeWidth={OUTLINE_WIDTH / zoomScale}
           strokeLinejoin="round"
@@ -86,7 +90,8 @@ export function ElementText({
       <text
         fill={element.color}
         fontSize={element.fontSize}
-        fontFamily={TEXT_FONT_FAMILY}
+        fontFamily={fontFamily}
+        fontWeight={fontWeight}
         xmlSpace="preserve"
       >
         {renderSpans()}

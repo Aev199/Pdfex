@@ -48,9 +48,13 @@ export function elementHit(
   const rx = radius / pageWidth
   const ry = radius / pageHeight
   if (p.x < b.x - rx || p.x > b.x + b.w + rx || p.y < b.y - ry || p.y > b.y + b.h + ry) return false
-  if (element.kind === 'text') return true
+  if (element.kind === 'text' || element.kind === 'callout') return true
   const reach = radius + element.strokeWidth / 2
   if (element.kind === 'ink') return nearLine(p, element.points, reach, pageWidth, pageHeight)
+  if (element.kind === 'measure') {
+    const closed = element.mode === 'area' ? [...element.points, element.points[0]] : element.points
+    return nearLine(p, closed, reach, pageWidth, pageHeight)
+  }
   return shapePolyline(element, pageWidth, pageHeight).some((line) =>
     nearLine(p, line, reach, pageWidth, pageHeight)
   )

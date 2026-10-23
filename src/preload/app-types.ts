@@ -17,6 +17,10 @@ export interface Settings {
   office: OfficePreference
   // Reopen the tabs of the last run on start.
   restoreSession: boolean
+  // Name signed under review comments.
+  commentAuthor: string
+  // Exported scans get their recognized text as an invisible layer.
+  exportOcr: boolean
 }
 
 export interface AppInfo {

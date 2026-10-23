@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import { join } from 'path'
+import { userInfo } from 'os'
 import { readFileSync } from 'fs'
 import { rename, writeFile } from 'fs/promises'
 import type { Settings } from '../preload/app-types'
@@ -13,7 +14,18 @@ export const DEFAULT_SETTINGS: Settings = {
   wheel: 'scroll',
   ocrLanguage: 'rus+eng',
   office: 'auto',
-  restoreSession: true
+  restoreSession: true,
+  commentAuthor: '',
+  exportOcr: true
+}
+
+// The Windows account name signs comments until the user picks a name.
+function accountName(): string {
+  try {
+    return userInfo().username.trim().slice(0, 60)
+  } catch {
+    return ''
+  }
 }
 
 // Updater bookkeeping that is not a user preference.
@@ -42,7 +54,12 @@ export function sanitize(raw: unknown): Stored {
     wheel: pick('wheel', oneOf(['scroll', 'zoom'])),
     ocrLanguage: pick('ocrLanguage', (v) => typeof v === 'string' && /^[a-z_+]{3,40}$/.test(v)),
     office: pick('office', oneOf(['auto', 'libreoffice'])),
-    restoreSession: pick('restoreSession', (v) => typeof v === 'boolean')
+    restoreSession: pick('restoreSession', (v) => typeof v === 'boolean'),
+    commentAuthor:
+      typeof input.commentAuthor === 'string' && input.commentAuthor.trim()
+        ? input.commentAuthor.trim().slice(0, 60)
+        : accountName(),
+    exportOcr: pick('exportOcr', (v) => typeof v === 'boolean')
   }
   if (typeof input.skippedVersion === 'string') result.skippedVersion = input.skippedVersion
   if (typeof input.checkedAt === 'number') result.checkedAt = input.checkedAt

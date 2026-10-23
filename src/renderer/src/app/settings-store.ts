@@ -10,7 +10,9 @@ export const DEFAULT_SETTINGS: Settings = {
   wheel: 'scroll',
   ocrLanguage: 'rus+eng',
   office: 'auto',
-  restoreSession: true
+  restoreSession: true,
+  commentAuthor: '',
+  exportOcr: true
 }
 
 let current: Settings = DEFAULT_SETTINGS
@@ -22,6 +24,8 @@ function publish(next: Settings): void {
 }
 
 export const getSettings = (): Settings => current
+
+export const commentAuthor = (): string => current.commentAuthor.trim() || 'Me'
 
 // Called once before the app mounts, so first renders see the saved values.
 export async function loadSettings(): Promise<void> {

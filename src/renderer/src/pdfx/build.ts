@@ -3,10 +3,13 @@ import type { PDFPage } from 'pdf-lib'
 
 import { MANIFEST_NAME, PDFX_VERSION } from './format'
 import { drawMarks } from './marks'
-import { drawElements, hasTextElements } from './elements'
-import { embedElementFonts } from './elements/fonts'
+import { drawElements } from './elements'
+import { embedElementFonts, fontFor, textRunsOf } from './elements/fonts'
+import type { TextLook } from '../elements/types'
 import type { ElementFonts } from './elements/fonts'
 import { registerAcroForm } from './form-fields'
+import { addCommentAnnotations } from './comments'
+import { drawOcrText, ocrText } from './ocr-layer'
 import type { ExportDocument, ExportPage, PdfxManifest, RasterExportPage } from './format'
 
 interface BuildContext {
@@ -14,6 +17,8 @@ interface BuildContext {
   sources: Map<string, PDFDocument>
   fonts: ElementFonts | null
 }
+
+const OCR_LOOK: TextLook = { font: 'sans', bold: false }
 
 const createContext = (output: PDFDocument): BuildContext => ({
   output,
@@ -25,8 +30,12 @@ async function elementFonts(
   ctx: BuildContext,
   page: ExportPage
 ): Promise<ElementFonts | undefined> {
-  if (!hasTextElements(page.elements)) return undefined
-  ctx.fonts = await embedElementFonts(ctx.output, page.elements, ctx.fonts)
+  const runs = textRunsOf(page.elements)
+  if (page.kind === 'source' && page.ocrWords?.length) {
+    runs.push({ text: ocrText(page.ocrWords), look: OCR_LOOK })
+  }
+  if (runs.length === 0) return undefined
+  ctx.fonts = await embedElementFonts(ctx.output, runs, ctx.fonts)
   return ctx.fonts
 }
 
@@ -42,6 +51,7 @@ async function addExportPage(ctx: BuildContext, page: ExportPage): Promise<void>
   if (page.kind === 'raster') {
     const added = await addRasterPage(ctx.output, page)
     drawElements(added, page.elements, fonts)
+    addCommentAnnotations(ctx.output, added, page.comments)
     turn(added, page.rotation)
     return
   }
@@ -52,8 +62,12 @@ async function addExportPage(ctx: BuildContext, page: ExportPage): Promise<void>
   }
   const [copied] = await ctx.output.copyPages(source, [page.pageIndex])
   ctx.output.addPage(copied)
+  if (fonts && page.ocrWords?.length) {
+    drawOcrText(copied, page.ocrWords, fontFor(fonts, ocrText(page.ocrWords), OCR_LOOK))
+  }
   drawElements(copied, page.elements, fonts)
   drawMarks(copied, page.marks)
+  addCommentAnnotations(ctx.output, copied, page.comments)
   turn(copied, page.rotation)
 }
 

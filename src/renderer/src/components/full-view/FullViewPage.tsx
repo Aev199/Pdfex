@@ -20,8 +20,12 @@ import { PageRotor, naturalSize } from '../PageRotor'
 import { CopyTextLayer, LinkLayer } from './ReaderLayers'
 import { ShapeLayer } from '../elements/ShapeLayer'
 import { EraseLayer } from '../elements/EraseLayer'
-import { isShapeTool } from '../../edit/types'
-import type { AnnotateHandlers } from './annotate'
+import { isMeasureTool, isShapeTool } from '../../edit/types'
+import { MeasureLayer } from '../elements/MeasureLayer'
+import { CalloutLayer } from '../elements/CalloutLayer'
+import { polylinePoints } from '../../elements/measures'
+import type { AnnotateHandlers, CommentLayerState } from './annotate'
+import { CommentPins, CommentPlaceLayer } from '../comments/CommentPins'
 
 interface FullViewPageProps {
   page: PageEntry
@@ -45,6 +49,7 @@ interface FullViewPageProps {
   onMoveElement: (id: string, dx: number, dy: number) => void
   onDraw: (points: ElementPoint[]) => void
   annotate: AnnotateHandlers
+  commentLayer: CommentLayerState
   // Follow a link to a page of the same file (its index in that file).
   onSourcePage: (sourceIndex: number) => void
   onAddText: (text: string, origin: ElementPoint) => void
@@ -60,6 +65,10 @@ export function FullViewPage(props: FullViewPageProps): React.JSX.Element {
   const { marks, selectTool, onMark, formValues, onField } = props
   const { elements, selectedElementId, onSelectElement, onMoveElement, onDraw } = props
   const { onAddText, onMarkText, onUpdateText } = props
+
+  const c = props.commentLayer
+  const threads = c.comments[p.id]
+  const draft = c.draft?.pageId === p.id ? c.draft.anchor : null
 
   const { active, query, matchingPageIds, getOcrWords } = useFindState()
   const highlight = active && isCurrent && matchingPageIds.has(p.id)
@@ -199,6 +208,33 @@ export function FullViewPage(props: FullViewPageProps): React.JSX.Element {
               }
             />
           )}
+          {isCurrent && (isMeasureTool(selectTool) || selectTool === 'calibrate') && (
+            <MeasureLayer
+              key={selectTool}
+              mode={selectTool === 'calibrate' ? 'calibrate' : selectTool}
+              style={props.annotate.style}
+              scale={props.annotate.measureScale}
+              naturalWidth={n.width}
+              naturalHeight={n.height}
+              pageWidth={p.width}
+              pageHeight={p.height}
+              onCommit={(points) =>
+                selectTool === 'calibrate'
+                  ? props.annotate.onCalibrate(polylinePoints(points, p.width, p.height))
+                  : props.annotate.onMeasure(p.id, selectTool, points, p.width, p.height)
+              }
+            />
+          )}
+          {isCurrent && selectTool === 'callout' && (
+            <CalloutLayer
+              style={props.annotate.textStyle}
+              naturalWidth={n.width}
+              naturalHeight={n.height}
+              onCommit={(anchor, origin, text) =>
+                props.annotate.onCallout(p.id, anchor, origin, text, p.width, p.height)
+              }
+            />
+          )}
           {isCurrent && selectTool === 'eraser' && (
             <EraseLayer
               elements={elements ?? []}
@@ -208,9 +244,28 @@ export function FullViewPage(props: FullViewPageProps): React.JSX.Element {
             />
           )}
           {isCurrent && selectTool === 'text' && (
-            <TypeLayer naturalHeight={n.height} onCommit={onAddText} />
+            <TypeLayer
+              naturalHeight={n.height}
+              style={props.annotate.textStyle}
+              onCommit={onAddText}
+            />
           )}
         </PageRotor>
+        {c.pinsShown && (threads || draft) && (
+          <CommentPins
+            threads={threads ?? []}
+            numbers={c.numbers}
+            rotation={p.rotation}
+            activeId={c.activeId}
+            showResolved={c.showResolved}
+            draft={draft}
+            zoomScale={isCurrent && zoomed ? view.zoom : 1}
+            onOpen={c.onOpen}
+          />
+        )}
+        {isCurrent && c.placing && (
+          <CommentPlaceLayer rotation={p.rotation} onPlace={(at) => c.onPlace(p.id, at)} />
+        )}
       </div>
     </div>
   )

@@ -57,6 +57,15 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
       </section>
 
       <section className="settings-section">
+        <h3>Comments</h3>
+        <label className="settings-row">
+          <span>Your name</span>
+          <AuthorInput value={settings.commentAuthor} />
+        </label>
+        <p className="settings-hint">Signs the comments and replies you write.</p>
+      </section>
+
+      <section className="settings-section">
         <h3>Search</h3>
         <label className="settings-row">
           <span>Text recognition (OCR) language</span>
@@ -72,6 +81,19 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
           </select>
         </label>
         <p className="settings-hint">Used by new tabs and after a restart.</p>
+        <label className="settings-choice">
+          <input
+            type="checkbox"
+            checked={settings.exportOcr}
+            onChange={(e) => void changeSettings({ exportOcr: e.target.checked })}
+          />
+          <span>Make exported scans searchable</span>
+        </label>
+        <p className="settings-hint">
+          Scanned pages are recognized before export and get their text as an invisible layer, so
+          the PDF can be searched and copied from anywhere. Pages with hidden text are left as they
+          are.
+        </p>
       </section>
 
       <section className="settings-section">
@@ -135,5 +157,22 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
         </section>
       )}
     </Dialog>
+  )
+}
+
+// Saved when the field is left, so each keystroke doesn't rewrite the file.
+function AuthorInput({ value }: { value: string }): React.JSX.Element {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => setDraft(value), [value])
+  return (
+    <input
+      className="settings-input"
+      value={draft}
+      maxLength={60}
+      spellCheck={false}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => draft.trim() !== value && void changeSettings({ commentAuthor: draft })}
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+    />
   )
 }

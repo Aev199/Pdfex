@@ -9,6 +9,9 @@ import { useCollection } from './app/useCollection'
 import { createZoomStore } from './app/zoom-store'
 import { useFullView } from './app/useFullView'
 import { useMarks } from './app/useMarks'
+import { useComments } from './app/useComments'
+import { CompareView } from './components/compare/CompareView'
+import type { ComparePage } from './components/compare/CompareView'
 import { useFormValues } from './app/useFormValues'
 import { useElements } from './app/useElements'
 import { ACTIONS, useUndoStack } from './app/undo'
@@ -105,6 +108,7 @@ export function WorkspaceView({
   const markState = useMarks(undoStack.push, initial.marks)
   const formState = useFormValues(initial.formValues)
   const elementState = useElements(undoStack.push, initial.elements, initial.nextElementNumber)
+  const commentState = useComments(initial.comments)
   const collection = useCollection(flash, undoStack.push, initial, onDetachedUpdate)
   const [missing, setMissing] = useState<MissingDoc[]>(initial.missing)
   const missingRef = useRef(missing)
@@ -117,6 +121,7 @@ export function WorkspaceView({
         docs: collection.docsRef.current,
         marks: markState.marksRef.current,
         elements: elementState.elementsRef.current,
+        comments: commentState.commentsRef.current,
         formValues: formState.valuesRef.current,
         nextElementNumber: elementState.nextNumberRef.current,
         undo: undoStack.snapshot(),
@@ -132,7 +137,7 @@ export function WorkspaceView({
       updateDocs: (update) => collection.setDocs(update),
       flash
     }),
-    [collection, markState, elementState, formState, undoStack, initial.view, flash]
+    [collection, markState, elementState, commentState, formState, undoStack, initial.view, flash]
   )
   const fullViewState = useFullView()
   const docs = collection.docs
@@ -147,6 +152,10 @@ export function WorkspaceView({
   )
   const aiActivity = useAiActivity()
   const { getOcrWords, ocrStatus, activateOcr } = searchIndex
+  const exportOcr = useMemo(
+    () => ({ words: getOcrWords, status: ocrStatus, activate: activateOcr }),
+    [getOcrWords, ocrStatus, activateOcr]
+  )
   const aiOcr = useMemo(
     () => ({ getOcrWords, ocrStatus, activateOcr }),
     [getOcrWords, ocrStatus, activateOcr]
@@ -184,7 +193,14 @@ export function WorkspaceView({
   onChangeRef.current = onChange
   useEffect(() => {
     onChangeRef.current()
-  }, [docs, markState.marks, elementState.elements, formState.values, missing])
+  }, [
+    docs,
+    markState.marks,
+    elementState.elements,
+    commentState.comments,
+    formState.values,
+    missing
+  ])
 
   const sourceWatch = useSourceWatch(docs, collection.swapSource, flash)
 
@@ -271,6 +287,8 @@ export function WorkspaceView({
     markState.marks,
     formState.values,
     elementState.elements,
+    commentState.comments,
+    exportOcr,
     setBusy,
     flash
   )
@@ -461,6 +479,20 @@ export function WorkspaceView({
     [workspaces, activeWorkspaceId, onMoveDocsToTab]
   )
 
+  // Two selected pages side by side as revisions: the first in the documents'
+  // order is taken as the older one.
+  const [compare, setCompare] = useState<{ older: ComparePage; newer: ComparePage } | null>(null)
+  const compareSelection = useCallback(() => {
+    const chosen = new Set(selectionRef.current.map((r) => r.pageId))
+    const found: ComparePage[] = []
+    for (const doc of collection.docsRef.current) {
+      doc.pages.forEach((page, i) => {
+        if (chosen.has(page.id)) found.push({ page, label: `${doc.name} · p. ${i + 1}` })
+      })
+    }
+    if (found.length === 2) setCompare({ older: found[0], newer: found[1] })
+  }, [selectionRef, collection.docsRef])
+
   const onPageContextMenu = useCallback(
     (docId: string, pageId: string, x: number, y: number) => {
       // Right-clicking inside the selection acts on all of it; outside, it
@@ -470,6 +502,12 @@ export function WorkspaceView({
       ensureSelected(docId, pageId)
       if (count > 1) {
         openMenu(x, y, [
+          ...(count === 2
+            ? [
+                { label: 'Compare the 2 pages', onClick: () => compareSelection() },
+                { separator: true as const }
+              ]
+            : []),
           { label: `Duplicate ${count} pages`, onClick: duplicateSelection },
           { label: `Copy ${count} pages`, onClick: copyPages },
           { label: 'Rotate right', onClick: () => rotateSelection(90) },
@@ -501,6 +539,7 @@ export function WorkspaceView({
     [
       selectionRef,
       ensureSelected,
+      compareSelection,
       openMenu,
       duplicateSelection,
       extractSelection,
@@ -667,6 +706,7 @@ export function WorkspaceView({
             marks={markState.marks}
             formValues={formState.values}
             elements={elementState.elements}
+            comments={commentState.comments}
             dragKind={drag.dragKind}
             draggingPage={drag.draggingPage}
             dropTarget={drag.dropTarget}
@@ -708,14 +748,25 @@ export function WorkspaceView({
               onAddInk={elementState.addInk}
               onAddShape={elementState.addShape}
               onRemoveElements={elementState.removeElements}
-              onAddText={elementState.addText}
+              onAddElement={elementState.addCreated}
+              onReplaceElement={elementState.replaceElement}
               onRemoveElement={elementState.removeElement}
               onMoveElement={elementState.moveElement}
               onToggleTextMark={elementState.toggleTextMark}
               onUpdateText={elementState.updateText}
+              comments={commentState}
               onActivePageChange={fullViewState.setHiddenPageId}
               onPrint={(pages, title) => void printPages(pages, title)}
               onClose={fullViewState.closeFullView}
+            />
+          )}
+
+          {compare && (
+            <CompareView
+              older={compare.older}
+              newer={compare.newer}
+              onSwap={() => setCompare((c) => c && { older: c.newer, newer: c.older })}
+              onClose={() => setCompare(null)}
             />
           )}
 

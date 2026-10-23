@@ -1,10 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DocEntry } from '../types'
-import type { MarkKind, MarkMap, MarkRect } from '../edit/types'
+import type { MarkKind, MarkLook, MarkMap, MarkRect } from '../edit/types'
 import { isMarkTool } from '../edit/types'
 import type { FieldValue, FormValuesBySource } from '../forms/types'
-import type { DrawStyle, ElementMap, ElementPoint, ShapeKind } from '../elements/types'
-import type { AnnotateHandlers } from './full-view/annotate'
+import type {
+  DrawStyle,
+  ElementMap,
+  ElementPoint,
+  PageElement,
+  ShapeKind,
+  TextStyle
+} from '../elements/types'
+import { createTextElement, restyledTextElement } from '../elements/create'
+import { createMeasureElement } from '../elements/measures'
+import { createCalloutElement, restyledCallout } from '../elements/callouts'
+import { CalibrateDialog } from './full-view/CalibrateDialog'
+import { AnnotateBar } from './full-view/AnnotateBar'
+import type { AnnotateHandlers, CommentLayerState } from './full-view/annotate'
+import { CommentsPanel } from './comments/CommentsPanel'
+import type { CommentState } from '../app/useComments'
+import type { CommentPoint } from '../comments/types'
+import { orderedThreads } from '../comments/threads'
 import type { TextSpan } from '../elements/text-marks'
 import type { Rect } from './full-view/geometry'
 import { useElementSelection } from './full-view/use-element-selection'
@@ -27,7 +43,7 @@ interface FullViewProps {
   startPageId: string
   originRect: Rect | null
   marks: MarkMap
-  onToggleMark: (pageId: string, kind: MarkKind, rects: MarkRect[]) => void
+  onToggleMark: (pageId: string, kind: MarkKind, rects: MarkRect[], look?: MarkLook) => void
   onRestoreMarks: (map: MarkMap) => void
   formValues: FormValuesBySource
   onFieldChange: (sourceId: string, fieldName: string, value: FieldValue) => void
@@ -49,12 +65,13 @@ interface FullViewProps {
     style: DrawStyle
   ) => void
   onRemoveElements: (pageId: string, ids: string[]) => void
-  onAddText: (
+  // Add an element made from the next element number.
+  onAddElement: (pageId: string, make: (number: number) => PageElement | null) => void
+  // Replace an element with a changed copy, one undo step.
+  onReplaceElement: (
     pageId: string,
-    text: string,
-    origin: ElementPoint,
-    pageWidth: number,
-    pageHeight: number
+    elementId: string,
+    change: (element: PageElement) => PageElement | null
   ) => void
   onRemoveElement: (pageId: string, elementId: string) => void
   onMoveElement: (pageId: string, elementId: string, dx: number, dy: number) => void
@@ -66,17 +83,26 @@ interface FullViewProps {
     pageWidth: number,
     pageHeight: number
   ) => void
+  comments: CommentState
   onActivePageChange: (pageId: string) => void
   onPrint: (pages: PageEntry[], title: string) => void
   onClose: () => void
 }
 
 const SIDEBAR_KEY = 'pdfx.readerSidebar'
-const readSidebarPref = (): boolean => {
+const COMMENTS_KEY = 'pdfx.readerComments'
+const readPref = (key: string): boolean => {
   try {
-    return localStorage.getItem(SIDEBAR_KEY) === '1'
+    return localStorage.getItem(key) === '1'
   } catch {
     return false
+  }
+}
+const writePref = (key: string, on: boolean): void => {
+  try {
+    localStorage.setItem(key, on ? '1' : '0')
+  } catch {
+    // Not remembered, still toggled.
   }
 }
 
@@ -94,11 +120,13 @@ export function FullView({
   onAddInk,
   onAddShape,
   onRemoveElements,
-  onAddText,
+  onAddElement,
+  onReplaceElement,
   onRemoveElement,
   onMoveElement,
   onToggleTextMark,
   onUpdateText,
+  comments,
   onActivePageChange,
   onPrint,
   onClose
@@ -178,33 +206,169 @@ export function FullView({
     ...controls
   })
 
-  const { drawStyle } = edit
+  const { drawStyle, textStyle, measureScale } = edit
+  const [calibration, setCalibration] = useState<number | null>(null)
   const annotate = useMemo<AnnotateHandlers>(
     () => ({
       style: drawStyle,
+      textStyle,
+      measureScale,
+      onMeasure: (pageId, mode, points, w, h) =>
+        onAddElement(pageId, (n) =>
+          createMeasureElement(mode, points, n, w, h, drawStyle, measureScale)
+        ),
+      onCalibrate: (length) => {
+        if (length > 3) setCalibration(length)
+      },
+      onCallout: (pageId, anchor, origin, text, w, h) =>
+        onAddElement(pageId, (n) => createCalloutElement(anchor, origin, text, n, w, h, textStyle)),
       onPen: (pageId, points, w, h) => onAddInk(pageId, points, w, h, drawStyle),
       onShape: (pageId, shape, from, to, w, h) =>
         onAddShape(pageId, shape, from, to, w, h, drawStyle),
       onErase: onRemoveElements
     }),
-    [drawStyle, onAddInk, onAddShape, onRemoveElements]
+    [drawStyle, textStyle, measureScale, onAddInk, onAddShape, onRemoveElements, onAddElement]
   )
 
+  const onAddText = useCallback(
+    (pageId: string, text: string, origin: ElementPoint, w: number, h: number) =>
+      onAddElement(pageId, (n) => createTextElement(text, origin, n, w, h, undefined, textStyle)),
+    [onAddElement, textStyle]
+  )
+
+  // The selected element, when it is text: the text controls restyle it.
+  const selectedText = useMemo(() => {
+    const sel = selection.selected
+    const element = sel ? elements[sel.pageId]?.find((e) => e.id === sel.elementId) : undefined
+    return sel && (element?.kind === 'text' || element?.kind === 'callout')
+      ? { pageId: sel.pageId, element }
+      : null
+  }, [selection.selected, elements])
+  const pageSize = useCallback(
+    (pageId: string) => {
+      for (const d of docs) {
+        const p = d.pages.find((page) => page.id === pageId)
+        if (p) return { w: p.width, h: p.height }
+      }
+      return null
+    },
+    [docs]
+  )
+  const changeTextStyle = useCallback(
+    (style: TextStyle) => {
+      edit.setTextStyle(style)
+      if (!selectedText || edit.tool !== null) return
+      const size = pageSize(selectedText.pageId)
+      if (!size) return
+      onReplaceElement(selectedText.pageId, selectedText.element.id, (e) =>
+        e.kind === 'text'
+          ? restyledTextElement(e, style, size.w, size.h)
+          : e.kind === 'callout'
+            ? restyledCallout(e, style, size.w, size.h)
+            : e
+      )
+    },
+    [edit, selectedText, pageSize, onReplaceElement]
+  )
+  const shownTextStyle: TextStyle =
+    selectedText && edit.tool === null
+      ? {
+          font: selectedText.element.font ?? 'sans',
+          bold: !!selectedText.element.bold,
+          fontSize: selectedText.element.fontSize,
+          color: selectedText.element.color
+        }
+      : textStyle
+
   // Reader sidebar (pages / outline), remembered between openings.
-  const [sidebarOpen, setSidebarOpen] = useState(readSidebarPref)
+  const [sidebarOpen, setSidebarOpen] = useState(() => readPref(SIDEBAR_KEY))
   const toggleSidebar = useCallback(() => {
     setSidebarOpen((open) => {
-      try {
-        localStorage.setItem(SIDEBAR_KEY, open ? '0' : '1')
-      } catch {
-        // Not remembered, still toggled.
-      }
+      writePref(SIDEBAR_KEY, !open)
       return !open
     })
   }, [])
   const { goTo } = controls
   const { di, doc, pi, page } = s
   const goToPage = useCallback((index: number) => goTo(di, index), [goTo, di])
+
+  // Review comments: the panel on the right and the pins on the pages.
+  const [commentsOpen, setCommentsOpenState] = useState(() => readPref(COMMENTS_KEY))
+  const setCommentsOpen = useCallback((open: boolean) => {
+    writePref(COMMENTS_KEY, open)
+    setCommentsOpenState(open)
+  }, [])
+  const [placing, setPlacing] = useState(false)
+  const [draft, setDraft] = useState<{ pageId: string; anchor: CommentPoint } | null>(null)
+  const [activeComment, setActiveComment] = useState<string | null>(null)
+  const [showResolved, setShowResolved] = useState(false)
+  const [pinsShown, setPinsShown] = useState(true)
+  const commentMap = comments.comments
+  // Pins are numbered through the document, page by page in reading order.
+  const commentNumbers = useMemo(() => {
+    const numbers = new Map<string, number>()
+    for (const d of docs) {
+      let n = 0
+      for (const p of d.pages) {
+        for (const t of orderedThreads(commentMap[p.id] ?? [])) numbers.set(t.id, ++n)
+      }
+    }
+    return numbers
+  }, [docs, commentMap])
+  const openComments = doc.pages.reduce(
+    (sum, p) => sum + (commentMap[p.id]?.filter((t) => !t.resolved).length ?? 0),
+    0
+  )
+  const commentLayer = useMemo<CommentLayerState>(
+    () => ({
+      comments: commentMap,
+      numbers: commentNumbers,
+      activeId: activeComment,
+      showResolved,
+      pinsShown: pinsShown || placing || draft !== null,
+      placing,
+      draft,
+      onOpen: (threadId) => {
+        setCommentsOpen(true)
+        setActiveComment(threadId)
+      },
+      onPlace: (pageId, anchor) => {
+        setPlacing(false)
+        setDraft({ pageId, anchor })
+        setActiveComment(null)
+        setCommentsOpen(true)
+      }
+    }),
+    [
+      commentMap,
+      commentNumbers,
+      activeComment,
+      showResolved,
+      pinsShown,
+      placing,
+      draft,
+      setCommentsOpen
+    ]
+  )
+  const toggleComments = useCallback(() => {
+    if (commentsOpen) {
+      setPlacing(false)
+      setDraft(null)
+    }
+    setCommentsOpen(!commentsOpen)
+  }, [commentsOpen, setCommentsOpen])
+  // Esc first gives up placing or writing a new comment, then closes as usual.
+  useEffect(() => {
+    if (!placing) return
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      setPlacing(false)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [placing])
 
   // An internal link: the page of the same file, if this document has it.
   const followLink = useCallback(
@@ -240,6 +404,9 @@ export function FullView({
       if (event.key === 'F4') {
         event.preventDefault()
         toggleSidebar()
+      } else if (event.key === 'F6') {
+        event.preventDefault()
+        toggleComments()
       } else if (event.key === 'Home' && !edit.editing) {
         event.preventDefault()
         goToPage(0)
@@ -250,7 +417,7 @@ export function FullView({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [toggleSidebar, goToPage, doc.pages.length, edit.editing])
+  }, [toggleSidebar, toggleComments, goToPage, doc.pages.length, edit.editing])
 
   useEffect(
     () =>
@@ -296,7 +463,14 @@ export function FullView({
         hasSelection={selection.selected !== null}
         selectTool={edit.editing ? edit.tool : null}
         onMark={(pageId, rects) => {
-          if (isMarkTool(edit.tool)) onToggleMark(pageId, edit.tool, rects)
+          if (isMarkTool(edit.tool)) {
+            onToggleMark(
+              pageId,
+              edit.tool,
+              rects,
+              edit.tool === 'highlight' ? edit.markLook : undefined
+            )
+          }
         }}
         formValues={formValues}
         onFieldChange={onFieldChange}
@@ -306,6 +480,7 @@ export function FullView({
         onMoveElement={onMoveElement}
         onDraw={onAddInk}
         annotate={annotate}
+        commentLayer={commentLayer}
         onSourcePage={followLink}
         onAddText={onAddText}
         onMarkText={(pageId, elementId, span) => {
@@ -330,8 +505,21 @@ export function FullView({
         onFinishEdit={edit.finishEdit}
         onRevert={edit.revert}
         onToggleTool={edit.toggleTool}
-        drawStyle={edit.drawStyle}
-        onDrawStyle={edit.setDrawStyle}
+        annotateBar={
+          <AnnotateBar
+            tool={edit.tool}
+            style={edit.drawStyle}
+            onTool={edit.toggleTool}
+            onStyle={edit.setDrawStyle}
+            textStyle={shownTextStyle}
+            onTextStyle={changeTextStyle}
+            markLook={edit.markLook}
+            onMarkLook={edit.setMarkLook}
+            textSelected={!!selectedText}
+            measureScale={edit.measureScale}
+            onMeasureScale={edit.setMeasureScale}
+          />
+        }
         runClose={controls.runClose}
         navByKey={controls.navByKey}
         goToPage={goToPage}
@@ -339,9 +527,63 @@ export function FullView({
         onToggleSidebar={toggleSidebar}
         onPrint={print}
         editBlocked={editBlocked}
+        commentsOpen={commentsOpen}
+        commentCount={openComments}
+        onToggleComments={toggleComments}
       />
       {sidebarOpen && !animating && <FullViewSidebar doc={doc} current={pi} onGo={goToPage} />}
+      {commentsOpen && !animating && (
+        <CommentsPanel
+          doc={doc}
+          comments={commentMap}
+          numbers={commentNumbers}
+          activeId={activeComment}
+          draftPage={draft ? doc.pages.findIndex((p) => p.id === draft.pageId) : null}
+          placing={placing}
+          showResolved={showResolved}
+          pinsShown={pinsShown}
+          onNew={() => {
+            setDraft(null)
+            setPlacing(!placing)
+          }}
+          onPost={(text) => {
+            if (!draft) return
+            setActiveComment(comments.addThread(draft.pageId, draft.anchor, text))
+            setDraft(null)
+          }}
+          onCancelDraft={() => setDraft(null)}
+          onSelect={(index, threadId) => {
+            setActiveComment(threadId)
+            if (index !== pi) goToPage(index)
+          }}
+          onReply={comments.reply}
+          onEdit={comments.editText}
+          onRemove={(pageId, threadId, replyId) => {
+            comments.remove(pageId, threadId, replyId)
+            if (replyId === null && threadId === activeComment) setActiveComment(null)
+          }}
+          onResolve={(pageId, threadId, resolved) => {
+            comments.resolve(pageId, threadId, resolved)
+            if (resolved && !showResolved) setActiveComment(null)
+          }}
+          onShowResolved={setShowResolved}
+          onPinsShown={setPinsShown}
+          onClose={toggleComments}
+        />
+      )}
       {edit.editing && isMarkTool(edit.tool) && <ToolCursor tool={edit.tool} />}
+      {calibration !== null && (
+        <CalibrateDialog
+          lengthPoints={calibration}
+          unit={edit.measureScale.unit}
+          onCancel={() => setCalibration(null)}
+          onConfirm={(scale) => {
+            edit.setMeasureScale(scale)
+            setCalibration(null)
+            edit.toggleTool('distance')
+          }}
+        />
+      )}
     </div>
   )
 }

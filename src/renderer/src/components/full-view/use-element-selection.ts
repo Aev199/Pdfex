@@ -43,7 +43,8 @@ export function useElementSelection(
     const onPointerDown = (event: PointerEvent): void => {
       if (!selectedRef.current) return
       const target = event.target instanceof Element ? event.target : null
-      if (!target?.closest('.element-hit, .element-pill')) setSelected(null)
+      // The annotation bar restyles the selection, so clicks there keep it.
+      if (!target?.closest('.element-hit, .element-pill, .annotate-bar')) setSelected(null)
     }
     window.addEventListener('keydown', onKey, true)
     window.addEventListener('pointerdown', onPointerDown, true)

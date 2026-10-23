@@ -1,4 +1,4 @@
-import { TEXT_LINE_HEIGHT } from '../../elements/types'
+import { TEXT_LINE_HEIGHT, lookOf } from '../../elements/types'
 import type { TextElement } from '../../elements/types'
 import { lineSpans } from '../../elements/text-marks'
 import type { TextSpan } from '../../elements/text-marks'
@@ -29,10 +29,16 @@ export function SelectPreview({
         const from = Math.max(span.start, line.start)
         const to = Math.min(span.end, line.end)
         if (to <= from) return []
-        const prefix = measureLineWidth(line.text.slice(0, from - line.start), element.fontSize)
+        const look = lookOf(element)
+        const prefix = measureLineWidth(
+          line.text.slice(0, from - line.start),
+          element.fontSize,
+          look
+        )
         const w = measureLineWidth(
           line.text.slice(from - line.start, to - line.start),
-          element.fontSize
+          element.fontSize,
+          look
         )
         return [
           <rect

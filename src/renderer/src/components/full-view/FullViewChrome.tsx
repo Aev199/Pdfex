@@ -1,8 +1,6 @@
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '../icons'
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, CommentIcon } from '../icons'
 import { isMac } from './geometry'
 import type { EditTool } from '../../edit/types'
-import type { DrawStyle } from '../../elements/types'
-import { AnnotateBar } from './AnnotateBar'
 import { useEffect, useState } from 'react'
 
 interface FullViewChromeProps {
@@ -17,8 +15,8 @@ interface FullViewChromeProps {
   onFinishEdit: () => void
   onRevert: () => void
   onToggleTool: (tool: EditTool) => void
-  drawStyle: DrawStyle
-  onDrawStyle: (style: DrawStyle) => void
+  // The annotation toolbar, shown while editing.
+  annotateBar: React.ReactNode
   runClose: () => void
   goToPage: (pi: number) => void
   sidebarOpen: boolean
@@ -27,6 +25,10 @@ interface FullViewChromeProps {
   // Editing is off on pages turned with Rotate (see FullView).
   editBlocked: string | null
   navByKey: (axis: 'x' | 'y', dir: 1 | -1) => void
+  commentsOpen: boolean
+  // Open comments of the document.
+  commentCount: number
+  onToggleComments: () => void
 }
 
 export function FullViewChrome({
@@ -41,15 +43,17 @@ export function FullViewChrome({
   onFinishEdit,
   onRevert,
   onToggleTool,
-  drawStyle,
-  onDrawStyle,
+  annotateBar,
   runClose,
   goToPage,
   sidebarOpen,
   onToggleSidebar,
   onPrint,
   editBlocked,
-  navByKey
+  navByKey,
+  commentsOpen,
+  commentCount,
+  onToggleComments
 }: FullViewChromeProps): React.JSX.Element {
   return (
     <div className="full-chrome" style={{ opacity: chromeOpacity }}>
@@ -116,14 +120,21 @@ export function FullViewChrome({
               </button>
             </>
           )}
+          <button
+            className={`btn glass comments-toggle${commentsOpen ? ' on' : ''}`}
+            title="Comments (F6)"
+            aria-pressed={commentsOpen}
+            onClick={onToggleComments}
+          >
+            <CommentIcon size={14} />
+            {commentCount > 0 && <span className="comments-toggle-count">{commentCount}</span>}
+          </button>
           <button className="btn glass square" title="Close (Esc)" onClick={runClose}>
             <CloseIcon size={16} />
           </button>
         </div>
       </header>
-      {editing && (
-        <AnnotateBar tool={tool} style={drawStyle} onTool={onToggleTool} onStyle={onDrawStyle} />
-      )}
+      {editing && annotateBar}
 
       <button
         className="full-nav prev"

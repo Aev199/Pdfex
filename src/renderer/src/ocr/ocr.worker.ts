@@ -11,7 +11,7 @@ function toWords(blocks: Tesseract.Block[] | null, width: number, height: number
         for (const word of line.words) {
           const { x0, y0, x1, y1 } = word.bbox
           words.push({
-            text: word.text.toLowerCase(),
+            text: word.text,
             x: x0 / width,
             y: y0 / height,
             w: (x1 - x0) / width,

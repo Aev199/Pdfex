@@ -21,7 +21,11 @@ export function Dialog({
     // Keys stay inside the dialog: Delete or Ctrl+A must not reach the
     // canvas behind it. Default actions (typing, select lists) still happen.
     const onKey = (event: KeyboardEvent): void => {
-      event.stopPropagation()
+      const target = event.target as HTMLElement | null
+      const field = !!target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+      // Fields keep their keys (Enter to confirm); canvas shortcuts already
+      // leave typing alone.
+      if (!field || event.key === 'Escape') event.stopPropagation()
       if (event.key !== 'Escape') return
       event.preventDefault()
       onClose()

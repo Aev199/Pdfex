@@ -4,6 +4,7 @@ import type { DrawStyle, ElementMap, ElementPoint, PageElement, ShapeKind } from
 import { translateElement } from '../elements/geometry'
 import { createInkElement, createTextElement, editedTextElement } from '../elements/create'
 import { createShapeElement } from '../elements/shapes'
+import { editedCallout } from '../elements/callouts'
 import { applyElementEntry } from '../elements/apply-entry'
 import { toggleMark } from '../elements/text-marks'
 import type { TextSpan } from '../elements/text-marks'
@@ -30,6 +31,13 @@ export function useElements(
       return element
     },
     [pushUndo]
+  )
+
+  // Any element made by a factory that gets the next element number.
+  const addCreated = useCallback(
+    (pageId: string, make: (number: number) => PageElement | null): PageElement | null =>
+      addElement(pageId, make(nextNumberRef.current)),
+    [addElement]
   )
 
   const addInk = useCallback(
@@ -145,6 +153,17 @@ export function useElements(
     [pushUndo]
   )
 
+  // Replace an element with a changed copy (restyled, retyped), one undo step.
+  const replaceElement = useCallback(
+    (pageId: string, elementId: string, change: (element: PageElement) => PageElement | null) => {
+      const element = elementsRef.current[pageId]?.find((e) => e.id === elementId)
+      if (!element) return
+      const after = change(element)
+      if (after && after !== element) updateElement(pageId, 'edit', element, after)
+    },
+    [updateElement]
+  )
+
   const moveElement = useCallback(
     (pageId: string, elementId: string, dx: number, dy: number) => {
       const element = elementsRef.current[pageId]?.find((e) => e.id === elementId)
@@ -169,7 +188,8 @@ export function useElements(
   const updateText = useCallback(
     (pageId: string, elementId: string, text: string, pageWidth: number, pageHeight: number) => {
       const element = elementsRef.current[pageId]?.find((e) => e.id === elementId)
-      if (!element || element.kind !== 'text' || text === element.text) return
+      if (!element || (element.kind !== 'text' && element.kind !== 'callout')) return
+      if (text === element.text) return
       if (text.trim().length === 0) {
         removeElement(pageId, elementId)
         return
@@ -178,7 +198,9 @@ export function useElements(
         pageId,
         'edit',
         element,
-        editedTextElement(element, text, pageWidth, pageHeight)
+        element.kind === 'text'
+          ? editedTextElement(element, text, pageWidth, pageHeight)
+          : editedCallout(element, text, pageWidth, pageHeight)
       )
     },
     [removeElement, updateElement]
@@ -221,6 +243,8 @@ export function useElements(
     elementsRef,
     copyToPages,
     nextNumberRef,
+    addCreated,
+    replaceElement,
     addInk,
     addShape,
     removeElements,

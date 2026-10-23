@@ -8,7 +8,9 @@ interface OcrBoxHighlightProps {
 export function OcrBoxHighlight({ words, query }: OcrBoxHighlightProps): React.JSX.Element {
   const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const hits =
-    tokens.length > 0 ? words.filter((word) => tokens.some((t) => word.text.includes(t))) : []
+    tokens.length > 0
+      ? words.filter((word) => tokens.some((t) => word.text.toLowerCase().includes(t)))
+      : []
 
   return (
     <div className="ocr-highlight-layer" aria-hidden="true">

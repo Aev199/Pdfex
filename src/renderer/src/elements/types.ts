@@ -1,6 +1,6 @@
 import type { MarkKind } from '../edit/types'
 
-export type ElementKind = 'ink' | 'text' | 'shape'
+export type ElementKind = 'ink' | 'text' | 'shape' | 'measure' | 'callout'
 
 export interface ElementPoint {
   x: number
@@ -30,12 +30,27 @@ export interface TextMark {
   end: number
 }
 
+export type TextFont = 'sans' | 'serif' | 'mono'
+
+// Typeface of a text element; missing fields mean sans, regular.
+export interface TextLook {
+  font: TextFont
+  bold: boolean
+}
+
+export interface TextStyle extends TextLook {
+  fontSize: number
+  color: string
+}
+
 export interface TextElement {
   id: string
   kind: 'text'
   number: number
   color: string
   fontSize: number
+  font?: TextFont
+  bold?: boolean
   text: string
   origin: ElementPoint
   marks: TextMark[]
@@ -57,6 +72,49 @@ export interface ShapeElement {
   bbox: ElementRect
 }
 
+export type MeasureMode = 'distance' | 'path' | 'area'
+export type MeasureUnit = 'mm' | 'cm' | 'm'
+
+// How sheet distances turn into real ones.
+export interface MeasureScale {
+  // Real length, in `unit`, of one PDF point on the sheet.
+  perPoint: number
+  unit: MeasureUnit
+  // "1:100", or "calibrated" when taken from a known dimension.
+  label: string
+}
+
+// A length, a chain of lengths or an enclosed area on a drawing; its label
+// is worked out from the points and the scale it was measured with.
+export interface MeasureElement {
+  id: string
+  kind: 'measure'
+  number: number
+  mode: MeasureMode
+  points: ElementPoint[]
+  color: string
+  strokeWidth: number
+  scale: MeasureScale
+  bbox: ElementRect
+}
+
+// Text in a frame with an arrow to the point it is about.
+export interface CalloutElement {
+  id: string
+  kind: 'callout'
+  number: number
+  // Tip of the arrow.
+  anchor: ElementPoint
+  // Top left of the text, inside the frame.
+  origin: ElementPoint
+  text: string
+  color: string
+  fontSize: number
+  font?: TextFont
+  bold?: boolean
+  bbox: ElementRect
+}
+
 // Pen and shape colour and line width, chosen in the annotation toolbar.
 export interface DrawStyle {
   color: string
@@ -66,7 +124,7 @@ export interface DrawStyle {
 export const DRAW_COLORS = ['#16161c', '#e5322d', '#1f6feb', '#1a9b4b', '#f59f00', '#8e44ad']
 export const DRAW_WIDTHS = [1, 2, 4, 8]
 
-export type PageElement = InkElement | TextElement | ShapeElement
+export type PageElement = InkElement | TextElement | ShapeElement | MeasureElement | CalloutElement
 
 export type ElementMap = Record<string, PageElement[]>
 
@@ -78,7 +136,27 @@ export const TEXT_COLOR = '#16161c'
 
 export const TEXT_FONT_SIZE = 14
 
-export const TEXT_FONT_FAMILY = 'Helvetica, Arial, sans-serif'
+export const TEXT_FONT_FAMILIES: Record<TextFont, string> = {
+  sans: 'Helvetica, Arial, sans-serif',
+  serif: '"Times New Roman", Times, serif',
+  mono: '"Courier New", Courier, monospace'
+}
+
+export const TEXT_FONT_FAMILY = TEXT_FONT_FAMILIES.sans
+
+export const TEXT_SIZES = [10, 12, 14, 18, 24, 32]
+
+export const lookOf = (e: { font?: TextFont; bold?: boolean }): TextLook => ({
+  font: e.font ?? 'sans',
+  bold: !!e.bold
+})
+
+export const DEFAULT_TEXT_STYLE: TextStyle = {
+  font: 'sans',
+  bold: false,
+  fontSize: 14,
+  color: '#16161c'
+}
 
 export const TEXT_LINE_HEIGHT = 1.25
 

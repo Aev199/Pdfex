@@ -4,6 +4,8 @@ import type { TextSpan } from '../../elements/text-marks'
 import { ElementPath } from './ElementPath'
 import { ElementText } from './ElementText'
 import { ElementShape } from './ElementShape'
+import { ElementMeasure } from './ElementMeasure'
+import { ElementCallout } from './ElementCallout'
 
 interface ElementNodeProps {
   element: PageElement
@@ -31,6 +33,10 @@ export function ElementNode({
   ...shared
 }: ElementNodeProps): React.JSX.Element {
   if (element.kind === 'shape') return <ElementShape element={element} {...shared} />
+  if (element.kind === 'measure') return <ElementMeasure element={element} {...shared} />
+  if (element.kind === 'callout') {
+    return <ElementCallout element={element} onEdit={onEdit} {...shared} />
+  }
   return element.kind === 'ink' ? (
     <ElementPath element={element} {...shared} />
   ) : (

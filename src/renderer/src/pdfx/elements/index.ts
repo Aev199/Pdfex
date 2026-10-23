@@ -1,10 +1,15 @@
 import type { PDFPage } from 'pdf-lib'
-import type { InkElement, PageElement, ShapeElement } from '../../elements/types'
+import { lookOf } from '../../elements/types'
+import type { InkElement, MeasureElement, PageElement, ShapeElement } from '../../elements/types'
 import { drawInkElements } from './ink'
 import { drawShapeElements } from './shapes'
 import { drawTextElement } from './text'
-import { fontForElement } from './fonts'
+import { drawMeasureElements } from './measures'
+import { drawCalloutElement } from './callouts'
+import { fontFor, fontForElement } from './fonts'
 import type { ElementFonts } from './fonts'
+
+const PLAIN = { font: 'sans', bold: false } as const
 
 export function drawElements(
   page: PDFPage,
@@ -21,10 +26,16 @@ export function drawElements(
     elements.filter((e): e is ShapeElement => e.kind === 'shape')
   )
   if (!fonts) return
+  drawMeasureElements(
+    page,
+    elements.filter((e): e is MeasureElement => e.kind === 'measure'),
+    (text) => fontFor(fonts, text, PLAIN)
+  )
   for (const element of elements) {
-    if (element.kind === 'text') drawTextElement(page, element, fontForElement(element, fonts))
+    if (element.kind === 'callout') {
+      drawCalloutElement(page, element, fontFor(fonts, element.text, lookOf(element)))
+    } else if (element.kind === 'text') {
+      drawTextElement(page, element, fontForElement(element, fonts))
+    }
   }
 }
-
-export const hasTextElements = (elements: PageElement[] | undefined): boolean =>
-  !!elements && elements.some((e) => e.kind === 'text')

@@ -5,11 +5,14 @@ export function translateElement(element: PageElement, dx: number, dy: number): 
   if (element.kind === 'text') {
     return { ...element, origin: { x: element.origin.x + dx, y: element.origin.y + dy }, bbox }
   }
+  const move = (p: ElementPoint): ElementPoint => ({ x: p.x + dx, y: p.y + dy })
   if (element.kind === 'shape') {
-    const move = (p: ElementPoint): ElementPoint => ({ x: p.x + dx, y: p.y + dy })
     return { ...element, from: move(element.from), to: move(element.to), bbox }
   }
-  return { ...element, points: element.points.map((p) => ({ x: p.x + dx, y: p.y + dy })), bbox }
+  if (element.kind === 'callout') {
+    return { ...element, anchor: move(element.anchor), origin: move(element.origin), bbox }
+  }
+  return { ...element, points: element.points.map(move), bbox }
 }
 
 export function bboxOfPoints(points: ElementPoint[], padX: number, padY: number): ElementRect {
