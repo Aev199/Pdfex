@@ -4,10 +4,12 @@ import type { PDFPage } from 'pdf-lib'
 import { MANIFEST_NAME, PDFX_VERSION } from './format'
 import { drawMarks } from './marks'
 import { drawElements } from './elements'
-import { embedElementFonts, textRunsOf } from './elements/fonts'
+import { embedElementFonts, fontFor, textRunsOf } from './elements/fonts'
+import type { TextLook } from '../elements/types'
 import type { ElementFonts } from './elements/fonts'
 import { registerAcroForm } from './form-fields'
 import { addCommentAnnotations } from './comments'
+import { drawOcrText, ocrText } from './ocr-layer'
 import type { ExportDocument, ExportPage, PdfxManifest, RasterExportPage } from './format'
 
 interface BuildContext {
@@ -15,6 +17,8 @@ interface BuildContext {
   sources: Map<string, PDFDocument>
   fonts: ElementFonts | null
 }
+
+const OCR_LOOK: TextLook = { font: 'sans', bold: false }
 
 const createContext = (output: PDFDocument): BuildContext => ({
   output,
@@ -27,6 +31,9 @@ async function elementFonts(
   page: ExportPage
 ): Promise<ElementFonts | undefined> {
   const runs = textRunsOf(page.elements)
+  if (page.kind === 'source' && page.ocrWords?.length) {
+    runs.push({ text: ocrText(page.ocrWords), look: OCR_LOOK })
+  }
   if (runs.length === 0) return undefined
   ctx.fonts = await embedElementFonts(ctx.output, runs, ctx.fonts)
   return ctx.fonts
@@ -55,6 +62,9 @@ async function addExportPage(ctx: BuildContext, page: ExportPage): Promise<void>
   }
   const [copied] = await ctx.output.copyPages(source, [page.pageIndex])
   ctx.output.addPage(copied)
+  if (fonts && page.ocrWords?.length) {
+    drawOcrText(copied, page.ocrWords, fontFor(fonts, ocrText(page.ocrWords), OCR_LOOK))
+  }
   drawElements(copied, page.elements, fonts)
   drawMarks(copied, page.marks)
   addCommentAnnotations(ctx.output, copied, page.comments)

@@ -486,6 +486,56 @@ test('comments: reply, resolve, survive a restart and export as PDF notes', asyn
   assert.doesNotMatch(content.items.map((i) => i.str).join(' '), /Check the dimension/)
 })
 
+test('an exported scan gets its recognized text as an invisible layer', async () => {
+  const scan = join(work, 'Скан акта.pdf')
+  const out = join(work, 'scan-searchable.pdf')
+  // A page that is only a picture of text, drawn by the app's own Chromium.
+  let run = await launch(freshData(), [])
+  let png
+  try {
+    png = await run.page.evaluate(() => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 1240
+      canvas.height = 1754
+      const g = canvas.getContext('2d')
+      g.fillStyle = '#fff'
+      g.fillRect(0, 0, canvas.width, canvas.height)
+      g.fillStyle = '#000'
+      g.font = '56px Arial, sans-serif'
+      g.fillText('Скважина 17 глубина', 120, 300)
+      g.fillText('Protocol 2024', 120, 420)
+      return canvas.toDataURL('image/png').split(',')[1]
+    })
+  } finally {
+    await run.app.close()
+  }
+  const doc = await PDFDocument.create()
+  const image = await doc.embedPng(Buffer.from(png, 'base64'))
+  doc.addPage([595, 842]).drawImage(image, { x: 0, y: 0, width: 595, height: 842 })
+  writeFileSync(scan, await doc.save())
+
+  run = await launch(freshData(), [scan])
+  try {
+    await rendered(run.page)
+    await mockSaveDialog(run.app, out)
+    await menu(run.app, 'export-pdf')
+    for (let i = 0; i < 300 && !existsSync(out); i++) await run.page.waitForTimeout(200)
+  } finally {
+    await run.app.close()
+  }
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const result = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(out)) }).promise
+  const content = await (await result.getPage(1)).getTextContent()
+  const text = content.items.map((item) => item.str).join(' ')
+  assert.match(text, /Скважина/)
+  assert.match(text, /Protocol/)
+  // The words lie where they were read: "Скважина" starts near the left edge,
+  // a third of the way down the scan.
+  const word = content.items.find((item) => item.str.includes('Скважина'))
+  assert.ok(Math.abs(word.transform[4] - 54) < 12, `x ${word.transform[4]}`)
+  assert.ok(Math.abs(word.transform[5] - (842 - 143)) < 20, `y ${word.transform[5]}`)
+})
+
 test('reader: thumbnails, page jump, rotation and printing', async () => {
   const { app, page } = await launch(freshData(), [files.report])
   try {

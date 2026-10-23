@@ -19,6 +19,8 @@ export interface Settings {
   restoreSession: boolean
   // Name signed under review comments.
   commentAuthor: string
+  // Exported scans get their recognized text as an invisible layer.
+  exportOcr: boolean
 }
 
 export interface AppInfo {

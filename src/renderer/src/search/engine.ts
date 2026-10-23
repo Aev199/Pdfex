@@ -137,7 +137,10 @@ export function createSearchEngine({
         })
         .catch((error: unknown) => {
           const message = error instanceof Error ? error.message : String(error)
-          if (message !== 'cancelled') console.warn('OCR failed', error)
+          if (message === 'cancelled') return
+          console.warn('OCR failed', error)
+          // Settled with nothing found, so nobody waits for it forever.
+          if (pagesBySource.has(job.key)) sourceOcrWords.set(job.key, [])
         })
         .finally(() => {
           ocrInFlight--

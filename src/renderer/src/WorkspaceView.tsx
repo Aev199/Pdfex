@@ -150,6 +150,10 @@ export function WorkspaceView({
   )
   const aiActivity = useAiActivity()
   const { getOcrWords, ocrStatus, activateOcr } = searchIndex
+  const exportOcr = useMemo(
+    () => ({ words: getOcrWords, status: ocrStatus, activate: activateOcr }),
+    [getOcrWords, ocrStatus, activateOcr]
+  )
   const aiOcr = useMemo(
     () => ({ getOcrWords, ocrStatus, activateOcr }),
     [getOcrWords, ocrStatus, activateOcr]
@@ -282,6 +286,7 @@ export function WorkspaceView({
     formState.values,
     elementState.elements,
     commentState.comments,
+    exportOcr,
     setBusy,
     flash
   )

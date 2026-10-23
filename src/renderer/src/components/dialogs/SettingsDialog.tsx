@@ -81,6 +81,19 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
           </select>
         </label>
         <p className="settings-hint">Used by new tabs and after a restart.</p>
+        <label className="settings-choice">
+          <input
+            type="checkbox"
+            checked={settings.exportOcr}
+            onChange={(e) => void changeSettings({ exportOcr: e.target.checked })}
+          />
+          <span>Make exported scans searchable</span>
+        </label>
+        <p className="settings-hint">
+          Scanned pages are recognized before export and get their text as an invisible layer, so
+          the PDF can be searched and copied from anywhere. Pages with hidden text are left as they
+          are.
+        </p>
       </section>
 
       <section className="settings-section">

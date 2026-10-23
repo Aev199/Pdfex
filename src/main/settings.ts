@@ -15,7 +15,8 @@ export const DEFAULT_SETTINGS: Settings = {
   ocrLanguage: 'rus+eng',
   office: 'auto',
   restoreSession: true,
-  commentAuthor: ''
+  commentAuthor: '',
+  exportOcr: true
 }
 
 // The Windows account name signs comments until the user picks a name.
@@ -57,7 +58,8 @@ export function sanitize(raw: unknown): Stored {
     commentAuthor:
       typeof input.commentAuthor === 'string' && input.commentAuthor.trim()
         ? input.commentAuthor.trim().slice(0, 60)
-        : accountName()
+        : accountName(),
+    exportOcr: pick('exportOcr', (v) => typeof v === 'boolean')
   }
   if (typeof input.skippedVersion === 'string') result.skippedVersion = input.skippedVersion
   if (typeof input.checkedAt === 'number') result.checkedAt = input.checkedAt

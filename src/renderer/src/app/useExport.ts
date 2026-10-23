@@ -9,6 +9,9 @@ import type { MarkMap } from '../edit/types'
 import type { FormValuesBySource } from '../forms/types'
 import type { ElementMap } from '../elements/types'
 import type { CommentMap } from '../comments/types'
+import { getSettings } from './settings-store'
+import { ocrKey, recognizeScans } from './export-ocr'
+import type { ExportOcr } from './export-ocr'
 
 const PDFX_FILTER = { name: 'PDFX', extensions: ['pdfx'] }
 const PDF_FILTER = { name: 'PDF', extensions: ['pdf'] }
@@ -24,6 +27,7 @@ export function useExport(
   formValues: FormValuesBySource,
   elements: ElementMap,
   comments: CommentMap,
+  ocr: ExportOcr,
   setBusy: (busy: boolean) => void,
   flash: (message: string) => void
 ) {
@@ -31,10 +35,28 @@ export function useExport(
     (pages: PageEntry[], filled: Map<string, Uint8Array>) =>
       Promise.all(
         pages.map((p) =>
-          prepareExportPage(p, marks[p.id], filled.get(p.source.id), elements[p.id], comments[p.id])
+          prepareExportPage(
+            p,
+            marks[p.id],
+            filled.get(p.source.id),
+            elements[p.id],
+            comments[p.id],
+            getSettings().exportOcr ? ocr.words(ocrKey(p)) : undefined
+          )
         )
       ),
-    [marks, elements, comments]
+    [marks, elements, comments, ocr]
+  )
+
+  // Saved files get the text of their scans: recognize what isn't yet.
+  const readScans = useCallback(
+    async (pages: PageEntry[]) => {
+      if (!getSettings().exportOcr) return
+      await recognizeScans(pages, ocr, (left) =>
+        flash(`Recognizing text on scanned pages: ${left} left…`)
+      )
+    },
+    [ocr, flash]
   )
 
   // A plain PDF of the given pages with everything drawn on them: marks,
@@ -91,6 +113,7 @@ export function useExport(
       if (!path) return
       await run(async () => {
         const filename = path.split(/[\\/]/).pop() ?? `untitled.${kind}`
+        await readScans(chosen.flatMap((d) => d.pages))
         const filled = await fillDocSources(chosen, formValues)
         const documents = await Promise.all(
           chosen.map(async (doc) => ({
@@ -105,7 +128,7 @@ export function useExport(
         return window.api.writeFile(path, bytes)
       })
     },
-    [docs, preparePages, formValues, flash, run]
+    [docs, preparePages, readScans, formValues, flash, run]
   )
 
   // Just these pages (e.g. the selection), as one PDF.
@@ -114,9 +137,12 @@ export function useExport(
       if (pages.length === 0) return
       const path = await window.api.chooseSavePath(`${safeFileName(name)}.pdf`, PDF_FILTER)
       if (!path) return
-      await run(async () => window.api.writeFile(path, await buildPagesPdf(pages)))
+      await run(async () => {
+        await readScans(pages)
+        return window.api.writeFile(path, await buildPagesPdf(pages))
+      })
     },
-    [buildPagesPdf, run]
+    [buildPagesPdf, readScans, run]
   )
 
   const exportZip = useCallback(async () => {
@@ -127,6 +153,7 @@ export function useExport(
     const path = await window.api.chooseSavePath('untitled.zip', ZIP_FILTER)
     if (!path) return
     await run(async () => {
+      await readScans(docs.flatMap((d) => d.pages))
       const filled = await fillDocSources(docs, formValues)
       const entries: Record<string, Uint8Array> = {}
       const used = new Set<string>()
@@ -139,7 +166,7 @@ export function useExport(
       }
       return window.api.writeFile(path, zipSync(entries))
     })
-  }, [docs, preparePages, formValues, flash, run])
+  }, [docs, preparePages, readScans, formValues, flash, run])
 
   return { exportCollection, exportPages, exportZip, buildPagesPdf, hasEdits }
 }

@@ -11,7 +11,8 @@ export const DEFAULT_SETTINGS: Settings = {
   ocrLanguage: 'rus+eng',
   office: 'auto',
   restoreSession: true,
-  commentAuthor: ''
+  commentAuthor: '',
+  exportOcr: true
 }
 
 let current: Settings = DEFAULT_SETTINGS
