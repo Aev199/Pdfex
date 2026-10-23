@@ -395,7 +395,9 @@ test('settings persist; help, about and an update from a folder', async () => {
     await page.keyboard.press('Escape')
 
     await menu(app, 'about')
-    assert.match(await page.locator('.about-name').innerText(), /^PDFx \d+\.\d+\.\d+/)
+    await page.waitForFunction(() =>
+      /^PDFx \d+\.\d+\.\d+/.test(document.querySelector('.about-name')?.textContent ?? '')
+    )
     await page.locator('.about-actions .btn', { hasText: 'Check for updates' }).click()
     await page.waitForFunction(() =>
       document.querySelector('.dialog-title span')?.textContent?.includes('9.9.9 is available')
