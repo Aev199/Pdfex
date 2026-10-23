@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { getSettings } from './settings-store'
 import { restoreSession, serializeSession } from './session'
 import type { Restored } from './session'
 import { safeFileName } from './useExport'
@@ -91,7 +92,8 @@ export function useSession({ tabsRef, liveSnapshot, adopt, flash }: SessionDeps)
     let alive = true
     void (async () => {
       try {
-        const loaded = await window.api.sessionLoad()
+        // "Reopen tabs from last time" off: start empty; autosave goes on.
+        const loaded = getSettings().restoreSession ? await window.api.sessionLoad() : null
         if (!alive || !loaded) return
         const restored = await restoreSession(loaded)
         for (const record of loaded.manifest.sources) {

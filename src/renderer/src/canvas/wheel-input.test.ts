@@ -21,6 +21,22 @@ describe('interpretWheel', () => {
     })
   })
 
+  it('zooms with the plain wheel in CAD mode, Ctrl then scrolls', () => {
+    expect(interpretWheel(wheel({ deltaY: -100 }), 800, true)).toEqual({
+      kind: 'zoom',
+      factor: NOTCH_ZOOM,
+      smooth: true
+    })
+    expect(interpretWheel(wheel({ deltaY: 100, ctrlKey: true }), 800, true).kind).toBe('pan')
+    expect(interpretWheel(wheel({ deltaY: 100, shiftKey: true }), 800, true)).toMatchObject({
+      kind: 'pan',
+      dx: 100
+    })
+    // A touchpad keeps its gestures: two-finger scroll pans, pinch zooms.
+    expect(interpretWheel(wheel({ deltaY: 4 }), 800, true).kind).toBe('pan')
+    expect(interpretWheel(wheel({ deltaY: 4, ctrlKey: true }), 800, true).kind).toBe('zoom')
+  })
+
   it('recognises notches at 125% and 150% display scaling', () => {
     expect(isNotched(wheel({ deltaY: 80 }))).toBe(true)
     expect(isNotched(wheel({ deltaY: -66.67 }))).toBe(true)

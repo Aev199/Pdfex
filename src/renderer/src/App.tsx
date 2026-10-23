@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAppDialogs } from './components/dialogs/AppDialogs'
 import { WorkspaceView } from './WorkspaceView'
 import type { WorkspaceViewHandle } from './WorkspaceView'
 import { TabBar } from './components/TabBar'
@@ -218,6 +219,7 @@ export default function App(): React.JSX.Element {
     })
   }, [addTab, closeTab, cycleTab, session])
 
+  const appDialogs = useAppDialogs()
   const active = tabs.workspaces.find((w) => w.id === tabs.activeId) ?? tabs.workspaces[0]
   const docCount = useCallback(
     (id: string) => {
@@ -238,6 +240,7 @@ export default function App(): React.JSX.Element {
       onRecolor={recolorTab}
       onSaveTab={session.saveTabAs}
       docCount={docCount}
+      trailing={appDialogs.trailing}
     />
   )
 
@@ -259,6 +262,7 @@ export default function App(): React.JSX.Element {
         onChange={scheduleSave}
         onOpenSession={session.openSessionFile}
       />
+      {appDialogs.dialogs}
     </ContextMenuProvider>
   )
 }

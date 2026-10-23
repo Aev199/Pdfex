@@ -1,4 +1,19 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import type { AppInfo, Settings, UpdateState } from './app-types'
+
+export type { AppInfo, Settings, UpdateState, UpdateOffer, UpdatePhase } from './app-types'
+
+export type UpdateAction =
+  | 'check'
+  | 'download'
+  | 'skip'
+  | 'dismiss'
+  | 'show'
+  | 'restart'
+  | 'rollback'
+  | 'cancel'
+  | 'browser'
+  | 'page'
 
 export interface OpenedFile {
   name: string
@@ -63,6 +78,11 @@ export type MenuAction =
   | 'save-session'
   | 'save-tab'
   | 'print'
+  | 'settings'
+  | 'help'
+  | 'shortcuts'
+  | 'check-updates'
+  | 'about'
 
 export interface SaveFilter {
   name: string
@@ -71,6 +91,26 @@ export interface SaveFilter {
 
 const api = {
   platform: process.platform,
+  getSettings: (): Promise<Settings> => ipcRenderer.invoke('pdfx:settings-get'),
+  setSettings: (patch: Partial<Settings>): Promise<Settings> =>
+    ipcRenderer.invoke('pdfx:settings-set', patch),
+  onSettings: (callback: (settings: Settings) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, settings: Settings): void =>
+      callback(settings)
+    ipcRenderer.on('pdfx:settings', listener)
+    return () => ipcRenderer.removeListener('pdfx:settings', listener)
+  },
+  appInfo: (): Promise<AppInfo> => ipcRenderer.invoke('pdfx:app-info'),
+  openDataFolder: (): Promise<string> => ipcRenderer.invoke('pdfx:open-data-folder'),
+  updateState: (): Promise<UpdateState> => ipcRenderer.invoke('pdfx:updates-state'),
+  updateAction: (action: UpdateAction): Promise<void> =>
+    ipcRenderer.invoke('pdfx:updates-action', action),
+  onUpdateState: (callback: (state: UpdateState) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: UpdateState): void =>
+      callback(state)
+    ipcRenderer.on('pdfx:updates', listener)
+    return () => ipcRenderer.removeListener('pdfx:updates', listener)
+  },
   rendererReady: (): Promise<void> => ipcRenderer.invoke('pdfx:renderer-ready'),
   chooseSavePath: (defaultName: string, filter?: SaveFilter): Promise<string | null> =>
     ipcRenderer.invoke('pdfx:choose-save-path', defaultName, filter),

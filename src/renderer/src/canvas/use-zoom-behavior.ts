@@ -3,6 +3,7 @@ import { pointer, select } from 'd3-selection'
 import { zoomIdentity, zoomTransform, type ZoomBehavior } from 'd3-zoom'
 import { createZoomBehavior } from './create-zoom-behavior'
 import { computeFitTransform } from './fit-transform'
+import { getSettings } from '../app/settings-store'
 import { WheelAnimator, interpretWheel } from './wheel-input'
 
 export {
@@ -91,7 +92,7 @@ export function useZoomBehavior({
 
     const onWheel = (event: WheelEvent): void => {
       event.preventDefault()
-      const intent = interpretWheel(event, vp.clientHeight)
+      const intent = interpretWheel(event, vp.clientHeight, getSettings().wheel === 'zoom')
       if (intent.kind === 'zoom') {
         const anchor = pointer(event, vp) as [number, number]
         if (intent.smooth) animator.zoom(intent.factor, anchor)

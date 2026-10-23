@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { ARROW_PAN, clamp, MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from './geometry'
 import type { View } from './geometry'
+import { getSettings } from '../../app/settings-store'
 import { WheelAnimator, interpretWheel } from '../../canvas/wheel-input'
 import type { FullViewControls } from './use-full-view-controls'
 
@@ -77,7 +78,7 @@ export function useFullViewInput(opts: InputOptions): void {
         event.preventDefault()
         return
       }
-      const intent = interpretWheel(event, sc.clientHeight)
+      const intent = interpretWheel(event, sc.clientHeight, getSettings().wheel === 'zoom')
       if (intent.kind === 'zoom') {
         event.preventDefault()
         if (intent.smooth) animator.zoom(intent.factor, [event.clientX, event.clientY])

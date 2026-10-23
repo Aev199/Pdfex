@@ -15,6 +15,8 @@ interface TabBarProps {
   onSaveTab?: (id: string) => void
   // How many documents a workspace holds (the active one is live, not its snapshot).
   docCount: (id: string) => number
+  // Shown at the far end of the bar (updates, settings, help).
+  trailing?: React.ReactNode
 }
 
 interface ColorPickerState {
@@ -32,7 +34,8 @@ export function TabBar({
   onRename,
   onRecolor,
   onSaveTab,
-  docCount: countDocs
+  docCount: countDocs,
+  trailing
 }: TabBarProps): React.JSX.Element {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
@@ -148,6 +151,7 @@ export function TabBar({
       <button className="tab-add" title="New tab" onClick={onAdd}>
         <PlusIcon size={14} />
       </button>
+      {trailing}
 
       {colorPicker && (
         <>

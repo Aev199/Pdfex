@@ -7,7 +7,6 @@ on:
   workflow_dispatch:
   push:
     branches: [windows-build]
-    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -26,8 +25,13 @@ jobs:
       - run: yarn electron-vite build
       - name: End-to-end checks on Windows
         run: yarn e2e
+      # Not a release: "ci" builds never update themselves.
+      - run: node scripts/stamp-version.mjs --channel ci
       - run: yarn electron-builder --win --publish never
       - run: node scripts/verify-portable.mjs dist/win-unpacked
+      - name: Updater folder swap on Windows
+        shell: pwsh
+        run: ./scripts/test-update-apply.ps1 dist/win-unpacked
       - name: Smoke-launch pdfx.exe
         shell: pwsh
         run: |

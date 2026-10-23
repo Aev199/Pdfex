@@ -47,12 +47,16 @@ export function isNotched(event: WheelLike): boolean {
   return (ax === 0 && ay >= NOTCH_MIN) || (ay === 0 && ax >= NOTCH_MIN)
 }
 
-export function interpretWheel(event: WheelLike, pagePx = 800): WheelIntent {
+// `wheelZooms` (a setting, as in CAD programs): a mouse wheel notch zooms and
+// Ctrl + wheel scrolls. Touchpad gestures are not affected.
+export function interpretWheel(event: WheelLike, pagePx = 800, wheelZooms = false): WheelIntent {
   let dx = toPixels(event.deltaX, event.deltaMode, pagePx)
   let dy = toPixels(event.deltaY, event.deltaMode, pagePx)
   const notched = isNotched(event)
+  const modifier = event.ctrlKey || event.metaKey
+  const zoom = notched && wheelZooms && !event.shiftKey ? !modifier : modifier
 
-  if (event.ctrlKey || event.metaKey) {
+  if (zoom) {
     const steps = notched ? -dy / NOTCH_PX : 0
     const raw = notched ? Math.pow(NOTCH_ZOOM, steps) : Math.exp(-dy * PINCH_SPEED)
     const factor = Math.min(MAX_EVENT_ZOOM, Math.max(1 / MAX_EVENT_ZOOM, raw))

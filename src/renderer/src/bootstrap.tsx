@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { GlobalWorkerOptions } from 'pdfjs-dist'
 import './pdf-upsert-polyfill'
 import App from './App'
+import { loadSettings } from './app/settings-store'
 import './styles.css'
 import './styles-windows.css'
 
@@ -22,9 +23,11 @@ export function mountPdfxApp(container: HTMLElement): void {
   )
   const pdfWorker = new Worker(new URL('./pdf.worker.ts', import.meta.url), { type: 'module' })
   GlobalWorkerOptions.workerPort = pdfWorker
-  createRoot(container).render(
-    <StrictMode>
-      <App />
-    </StrictMode>
-  )
+  const mount = (): void =>
+    createRoot(container).render(
+      <StrictMode>
+        <App />
+      </StrictMode>
+    )
+  void loadSettings().finally(mount)
 }

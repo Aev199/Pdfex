@@ -1,0 +1,156 @@
+import { useState } from 'react'
+import { Dialog } from './Dialog'
+
+export type HelpTopic = 'guide' | 'shortcuts'
+
+const MOD = window.api?.platform === 'darwin' ? '⌘' : 'Ctrl'
+const COPY_DRAG = window.api?.platform === 'darwin' ? 'Alt' : 'Ctrl'
+
+const SHORTCUTS: [string, [string, string][]][] = [
+  [
+    'Canvas',
+    [
+      ['Wheel', 'Scroll up and down (Settings can make it zoom)'],
+      ['Shift + wheel', 'Scroll sideways'],
+      [`${MOD} + wheel, pinch`, 'Zoom around the pointer'],
+      ['Middle button drag', 'Move the canvas from anywhere'],
+      [`${MOD} + 0`, 'Fit to window'],
+      [`${MOD} + =  /  ${MOD} + -`, 'Zoom in / out'],
+      ['Double-click a page', 'Open it in the reader']
+    ]
+  ],
+  [
+    'Pages and documents',
+    [
+      [`${MOD} + click, Shift + click`, 'Add a page / a range to the selection'],
+      [`${MOD} + A`, 'Select all pages'],
+      [`${MOD} + C  /  ${MOD} + V`, 'Copy the selected pages / paste after the selected page'],
+      [`${MOD} + D`, 'Duplicate the selection'],
+      ['Delete', 'Delete the selection'],
+      ['Drag a page', 'Move it; with ' + COPY_DRAG + ' held, copy it'],
+      [`${MOD} + Z  /  ${MOD} + Y`, 'Undo / redo'],
+      [`${MOD} + F`, 'Find in all documents of the tab'],
+      ['Esc', 'Clear the selection']
+    ]
+  ],
+  [
+    'Reader',
+    [
+      ['← →, Home, End', 'Previous, next, first, last page'],
+      ['F4', 'Thumbnails and outline'],
+      ['Page number', 'Type a number and press Enter'],
+      [`${MOD} + C`, 'Copy the selected text'],
+      ['Esc', 'Back to the canvas']
+    ]
+  ],
+  [
+    'Files and tabs',
+    [
+      [`${MOD} + O`, 'Open files'],
+      [`${MOD} + P`, 'Print'],
+      [`${MOD} + E`, 'Export .pdfx'],
+      [`${MOD} + Shift + S`, 'Save the session as .pdfxs'],
+      [`${MOD} + T  /  ${MOD} + W`, 'New tab / close tab'],
+      ['Ctrl + Tab', 'Next tab'],
+      [`${MOD} + ,`, 'Settings'],
+      ['F1', 'This help']
+    ]
+  ]
+]
+
+function Guide(): React.JSX.Element {
+  return (
+    <div className="help-guide">
+      <h3>Opening files</h3>
+      <p>
+        Drop PDFs, images or Word, Excel and PowerPoint documents onto the window or onto pdfx.exe,
+        or use File → Open. Office files are converted to PDF by Microsoft Office when it is
+        installed, otherwise by LibreOffice; macros stay off and nothing leaves the computer.
+      </p>
+      <h3>The canvas</h3>
+      <p>
+        Every document is a row of pages. Right-click a page or a document for its menu: duplicate,
+        copy, split, extract, rotate, export, open in another program, show in Explorer, move to
+        another tab, delete. Drag pages between documents, or between rows to start a new document.
+        Drag a document&apos;s number (01, 02…) to Explorer to get a PDF.
+      </p>
+      <h3>Reading</h3>
+      <p>
+        Double-click a page to read it full screen. F4 shows thumbnails or the outline, links work,
+        text can be selected and copied. Large drawings are redrawn sharply after zooming, up to
+        9000%.
+      </p>
+      <h3>Annotations</h3>
+      <p>
+        In the reader press Edit: signature, text, highlight, redaction, pen, line, arrow,
+        rectangle, ellipse and eraser. Shift keeps lines at 45° and shapes square. Source PDFs are
+        never changed: annotations live in the session and go into a PDF only on export or print.
+      </p>
+      <h3>Tabs and sessions</h3>
+      <p>
+        Each tab keeps its documents, annotations, zoom and undo history. Everything is saved a
+        second after each change and when PDFx closes, and comes back after a restart or a crash.
+        File → Save Session As stores all tabs in a .pdfxs file. When a source file was moved,
+        Locate… finds it again; when another program changed it, Reload picks the new version.
+      </p>
+      <h3>Search</h3>
+      <p>
+        {MOD} + F searches all documents of the tab. Scans are recognised on the computer the first
+        time you search; the language is chosen in the search bar or in Settings.
+      </p>
+      <h3>Updates</h3>
+      <p>
+        Release builds look for a new version once a day (Settings → Updates) and on Help → Check
+        for Updates. The new version replaces the program folder when PDFx restarts or closes; the
+        data folder stays, and the previous version can be brought back in About.
+      </p>
+    </div>
+  )
+}
+
+function Shortcuts(): React.JSX.Element {
+  return (
+    <div className="help-shortcuts">
+      {SHORTCUTS.map(([group, rows]) => (
+        <section key={group}>
+          <h3>{group}</h3>
+          <table>
+            <tbody>
+              {rows.map(([keys, what]) => (
+                <tr key={keys}>
+                  <td>
+                    <kbd>{keys}</kbd>
+                  </td>
+                  <td>{what}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+export function HelpDialog({
+  topic,
+  onClose
+}: {
+  topic: HelpTopic
+  onClose: () => void
+}): React.JSX.Element {
+  const [tab, setTab] = useState<HelpTopic>(topic)
+  return (
+    <Dialog title="PDFx Help" className="help-dialog" onClose={onClose}>
+      <div className="help-tabs" role="tablist">
+        <button className={tab === 'guide' ? 'active' : ''} onClick={() => setTab('guide')}>
+          Guide
+        </button>
+        <button className={tab === 'shortcuts' ? 'active' : ''} onClick={() => setTab('shortcuts')}>
+          Keyboard shortcuts
+        </button>
+      </div>
+      {tab === 'guide' ? <Guide /> : <Shortcuts />}
+    </Dialog>
+  )
+}

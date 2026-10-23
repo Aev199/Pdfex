@@ -1,0 +1,128 @@
+name: Release
+
+# Builds, checks and publishes a release that PDFx installs in-app (as Papka
+# does): GitHub → Actions → Release → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Канал: beta — для проверки, stable — для всех'
+        type: choice
+        options: [beta, stable]
+        default: beta
+      publish:
+        description: 'Опубликовать выпуск (обновление придёт в PDFx)'
+        type: boolean
+        default: true
+      notes:
+        description: 'Что нового, пункты через ; (пусто — заголовки коммитов)'
+        type: string
+        default: ''
+
+# Writing is needed only to publish the release.
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tags and history: the change list runs since the previous release.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - name: Stamp version
+        shell: pwsh
+        run: |
+          $version = "1.0.${{ github.run_number }}"
+          $commit = "${{ github.sha }}".Substring(0, 7)
+          "PDFX_VERSION=$version" >> $env:GITHUB_ENV
+          "PDFX_COMMIT=$commit" >> $env:GITHUB_ENV
+          node scripts/stamp-version.mjs --version $version --commit $commit --channel ${{ inputs.channel }} --package
+      - run: yarn typecheck
+      - run: yarn test
+      - run: yarn electron-vite build
+      - name: End-to-end checks on Windows
+        run: yarn e2e
+      - run: yarn electron-builder --win --publish never
+      - run: node scripts/verify-portable.mjs dist/win-unpacked
+      - name: Updater folder swap on Windows
+        shell: pwsh
+        run: ./scripts/test-update-apply.ps1 dist/win-unpacked
+      - name: Smoke-launch pdfx.exe
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist/win-unpacked/pdfx.exe -PassThru
+          Start-Sleep -Seconds 15
+          if ($p.HasExited) { throw "pdfx.exe exited early with code $($p.ExitCode)" }
+          taskkill /F /T /PID $p.Id | Out-Null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PDFx-Windows-Portable-${{ env.PDFX_VERSION }}
+          path: dist/PDFx-Windows-Portable.zip
+          if-no-files-found: error
+      # latest.json carries the version, the SHA-256 of the ZIP and the change
+      # list; PDFx checks both before installing. A re-run of the same build
+      # number does not publish twice.
+      - name: Publish release
+        if: ${{ inputs.publish }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ inputs.channel }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+          $tag = "v$env:PDFX_VERSION"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Warning "Release $tag already exists; nothing published."
+            exit 0
+          }
+          if ($env:NOTES.Trim()) {
+            $notes = @($env:NOTES -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+          } else {
+            $previous = git describe --tags --abbrev=0 --match "v*" 2>$null
+            $range = if ($LASTEXITCODE -eq 0 -and $previous) { @("$previous..HEAD") } else { @("-n", "15") }
+            $notes = @(git -c i18n.logOutputEncoding=UTF-8 log --no-merges --format=%s @range)
+          }
+          $zip = "dist/PDFx-Windows-Portable.zip"
+          $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = [ordered]@{
+            version = $env:PDFX_VERSION
+            commit = $env:PDFX_COMMIT
+            channel = $env:CHANNEL
+            sha256 = $sha
+            notes = $notes
+          } | ConvertTo-Json -Depth 3
+          $utf8 = [System.Text.UTF8Encoding]::new($false)
+          [System.IO.File]::WriteAllText((Join-Path $PWD "dist/latest.json"), $manifest, $utf8)
+          $body = ($notes | ForEach-Object { "- $_" }) -join "`n"
+          [System.IO.File]::WriteAllText((Join-Path $PWD "dist/notes.md"), "$body`n`nSHA-256 PDFx-Windows-Portable.zip: ``$sha``", $utf8)
+          $flags = @()
+          if ($env:CHANNEL -ne "stable") { $flags += "--prerelease" }
+          gh release create $tag $zip "dist/latest.json" `
+            --target "${{ github.sha }}" --title "PDFx $env:PDFX_VERSION" --notes-file "dist/notes.md" @flags
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # A fixed link for the browser on the beta channel: GitHub's
+          # releases/latest skips pre-releases. The "beta" release holds only
+          # the newest ZIP (any channel) and no latest.json, so PDFx never
+          # offers it as an update.
+          gh release view beta *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create beta --prerelease --target "${{ github.sha }}" --title "PDFx: последняя сборка" `
+              --notes "Здесь всегда лежит самый свежий PDFx-Windows-Portable.zip (бета или стабильный). Список изменений — в выпусках с номерами."
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          gh release upload beta $zip --clobber
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

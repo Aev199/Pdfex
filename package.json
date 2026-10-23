@@ -1,7 +1,7 @@
 {
   "name": "pdfx",
   "productName": "PDFx",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "PDFX — a backwards-compatible PDF extension for multi-document files, with a minimal viewer",
   "main": "./out/main/index.js",
   "author": "Alex Gounis",
@@ -22,7 +22,7 @@
     "build": "yarn typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps && yarn build:native && node scripts/copy-ocr-assets.mjs && node scripts/copy-pdf-assets.mjs",
     "build:unpack": "yarn build && electron-builder --dir",
-    "build:win": "yarn build && electron-builder --win",
+    "build:win": "yarn build && node scripts/stamp-version.mjs && electron-builder --win",
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:linux": "electron-vite build && electron-builder --linux",
     "build:linux:flatpak": "electron-vite build && electron-builder --linux flatpak"

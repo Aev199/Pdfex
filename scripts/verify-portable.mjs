@@ -9,6 +9,7 @@ const res = join(dir, 'resources')
 const required = [
   'pdfx.exe',
   'README.txt',
+  'version.json',
   'resources/app.asar',
   'resources/ocr/worker.min.js',
   'resources/pdf/standard_fonts',

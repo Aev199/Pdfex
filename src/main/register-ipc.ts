@@ -1,4 +1,4 @@
-import { ipcMain, dialog, clipboard, nativeImage } from 'electron'
+import { ipcMain, dialog, clipboard, nativeImage, shell, app } from 'electron'
 import { basename, isAbsolute } from 'path'
 import { existsSync } from 'fs'
 import { writeFile } from 'fs/promises'
@@ -14,10 +14,57 @@ import type { OpenAction, OpenSource } from './open-with'
 import { loadAutosave, openSessionFile, saveSession, writeSessionFile } from './session'
 import type { SessionManifest } from './session'
 import { getMainWindow, setRendererReady, sendOpenPaths } from './window'
+import { getSettings, onSettingsChanged, updateSettings } from './settings'
+import * as updater from './updates/updater'
+import type { Settings } from '../preload/app-types'
+import type { UpdateAction } from '../preload'
 
 const MAX_WRITE_BYTES = 1024 * 1024 * 1024 // 1 GiB cap on a single IPC write
 
 export function registerIpc(getPending: () => string[], clearPending: () => void): void {
+  ipcMain.handle('pdfx:settings-get', () => getSettings())
+  ipcMain.handle('pdfx:settings-set', (_event, patch: Partial<Settings>) =>
+    updateSettings(patch && typeof patch === 'object' ? patch : {})
+  )
+  onSettingsChanged((settings) => getMainWindow()?.webContents.send('pdfx:settings', settings))
+  ipcMain.handle('pdfx:app-info', () => updater.appInfo())
+  ipcMain.handle('pdfx:open-data-folder', () => shell.openPath(app.getPath('userData')))
+  ipcMain.handle('pdfx:updates-state', () => updater.updateState())
+  ipcMain.handle('pdfx:updates-action', async (_event, action: UpdateAction) => {
+    switch (action) {
+      case 'check':
+        return updater.check(true)
+      case 'download':
+        return updater.download()
+      case 'skip':
+        return updater.skip()
+      case 'dismiss':
+        return updater.dismiss()
+      case 'show':
+        return updater.show()
+      case 'restart':
+        return updater.restart()
+      case 'rollback':
+        return updater.rollback()
+      case 'cancel':
+        return updater.cancelPending()
+      case 'browser':
+        return updater.downloadInBrowser()
+      case 'page': {
+        const phase = updater.updateState().phase
+        const page =
+          phase.kind === 'available' || phase.kind === 'ready'
+            ? phase.offer.page
+            : phase.kind === 'failed'
+              ? phase.offer?.page
+              : undefined
+        if (page?.startsWith('https://')) await shell.openExternal(page)
+        else if (page) await shell.openPath(page)
+        return
+      }
+    }
+  })
+
   ipcMain.handle('pdfx:renderer-ready', async () => {
     setRendererReady(true)
     const paths = getPending()

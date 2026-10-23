@@ -35,6 +35,8 @@ export function buildMenu(): void {
         },
         { label: 'Save Tab As…', click: sendMenu('save-tab') },
         { type: 'separator' },
+        { label: 'Settings…', accelerator: 'CommandOrControl+,', click: sendMenu('settings') },
+        { type: 'separator' },
         process.platform === 'darwin' ? { role: 'close' as const } : { role: 'quit' as const }
       ]
     },
@@ -87,6 +89,16 @@ export function buildMenu(): void {
       submenu: [
         { role: 'minimize' },
         ...(process.platform === 'darwin' ? [{ role: 'zoom' as const }] : [])
+      ]
+    },
+    {
+      role: 'help',
+      submenu: [
+        { label: 'PDFx Help', accelerator: 'F1', click: sendMenu('help') },
+        { label: 'Keyboard Shortcuts', click: sendMenu('shortcuts') },
+        { type: 'separator' },
+        { label: 'Check for Updates…', click: sendMenu('check-updates') },
+        { label: 'About PDFx', click: sendMenu('about') }
       ]
     }
   ]

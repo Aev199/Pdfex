@@ -48,6 +48,9 @@ win:
   extraFiles:
     - from: build/win/portable
       to: '.'
+    # version.json from scripts/stamp-version.mjs: what the updater compares.
+    - from: build/stamp
+      to: '.'
 linux:
   target:
     - AppImage

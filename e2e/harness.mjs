@@ -9,11 +9,11 @@ import electronPath from 'electron'
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)))
 
 // Launch the built app (out/) with its data folder pinned to `dataDir`.
-export async function launch(dataDir, files = []) {
+export async function launch(dataDir, files = [], env = {}) {
   const app = await electron.launch({
     executablePath: electronPath,
     args: [ROOT, '--no-sandbox', ...files],
-    env: { ...process.env, PDFX_USER_DATA: dataDir },
+    env: { ...process.env, PDFX_USER_DATA: dataDir, ...env },
     timeout: 60_000
   })
   const page = await app.firstWindow()

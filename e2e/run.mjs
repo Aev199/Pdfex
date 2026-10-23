@@ -1,11 +1,13 @@
 // End-to-end checks of the built app (yarn electron-vite build first).
 // Linux CI runs them under Xvfb: xvfb-run -a yarn e2e
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PDFDocument } from 'pdf-lib'
 import { inflateSync } from 'node:zlib'
+import { createHash } from 'node:crypto'
+import { strToU8, zipSync } from 'fflate'
 import { makeFixtures } from './fixtures.mjs'
 import {
   clickMenuItem,
@@ -354,6 +356,70 @@ test('an Office document converts to PDF, or says what to install', async () => 
         /install Microsoft Word or LibreOffice/
       )
     }
+  } finally {
+    await app.close()
+  }
+})
+
+test('settings persist; help, about and an update from a folder', async () => {
+  const data = freshData()
+  // A release in a folder instead of GitHub: latest.json and the ZIP.
+  const feed = mkdtempSync(join(work, 'feed-'))
+  const zip = zipSync({
+    'pdfx.exe': strToU8('MZ'),
+    'resources/app.asar': strToU8('asar'),
+    'version.json': strToU8('{"version":"9.9.9","commit":"e2e","channel":"stable"}')
+  })
+  writeFileSync(join(feed, 'PDFx-Windows-Portable.zip'), zip)
+  const sha256 = createHash('sha256').update(zip).digest('hex')
+  writeFileSync(
+    join(feed, 'latest.json'),
+    JSON.stringify({ version: '9.9.9', sha256, notes: ['Settings, About and Help'] })
+  )
+  const env = { PDFX_UPDATE_FEED: feed }
+  const scale = async (page) => Number(/scale\(([\d.]+)/.exec(await worldTransform(page))?.[1])
+  const dialogTitle = (page) => page.locator('.dialog-title span').first().innerText()
+
+  let { app, page } = await launch(data, [files.second], env)
+  try {
+    await rendered(page)
+    await menu(app, 'settings')
+    await page.locator('.settings-choice', { hasText: 'Zooms, as in CAD' }).click()
+    await page.keyboard.press('Escape')
+    assert.equal(await page.locator('.dialog').count(), 0)
+
+    await menu(app, 'help')
+    assert.equal(await dialogTitle(page), 'PDFx Help')
+    await page.locator('.help-tabs button', { hasText: 'Keyboard' }).click()
+    assert.ok((await page.locator('.help-shortcuts tr').count()) > 20)
+    await page.keyboard.press('Escape')
+
+    await menu(app, 'about')
+    assert.match(await page.locator('.about-name').innerText(), /^PDFx \d+\.\d+\.\d+/)
+    await page.locator('.about-actions .btn', { hasText: 'Check for updates' }).click()
+    await page.waitForFunction(() =>
+      document.querySelector('.dialog-title span')?.textContent?.includes('9.9.9 is available')
+    )
+    await page.locator('.dialog-footer .btn', { hasText: 'Update' }).click()
+    await page.waitForFunction(() =>
+      document.querySelector('.dialog-title span')?.textContent?.includes('is ready')
+    )
+    assert.ok(existsSync(join(data, 'updates', 'staged', 'resources', 'app.asar')))
+  } finally {
+    await app.close()
+  }
+  assert.equal(JSON.parse(readFileSync(join(data, 'settings.json'), 'utf8')).wheel, 'zoom')
+  ;({ app, page } = await launch(data, [], env))
+  try {
+    await rendered(page)
+    // The unpacked update waits for a restart; the wheel now zooms.
+    assert.match(await page.locator('.update-badge').innerText(), /Restart to update/)
+    const before = await scale(page)
+    const box = await page.locator('.canvas-world .page[data-page-id]').first().boundingBox()
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.wheel(0, -100)
+    await page.waitForTimeout(600)
+    assert.ok((await scale(page)) > before * 1.1)
   } finally {
     await app.close()
   }

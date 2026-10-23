@@ -10,6 +10,7 @@ import { registerIpc } from './register-ipc'
 import { registerAssetProtocol, registerAssetSchemePrivileged } from './assets'
 import { configureDataLocation } from './portable'
 import { cleanupTempExports } from './open-with'
+import { applyOnQuit, initUpdater } from './updates/updater'
 
 app.setName('PDFx')
 
@@ -73,6 +74,7 @@ if (!gotLock) {
 
     buildMenu()
     createWindow()
+    void initUpdater(dataLocation.kind === 'portable')
 
     if (dataLocation.kind === 'fallback') {
       void dialog.showMessageBox({
@@ -98,6 +100,7 @@ if (!gotLock) {
 }
 
 app.on('will-quit', () => {
+  applyOnQuit()
   void cleanupTempExports()
 })
 

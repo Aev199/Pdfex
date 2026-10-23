@@ -6,6 +6,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { pathToFileURL } from 'url'
+import { getSettings } from './settings'
 import { queryAppPath } from './open-with'
 
 // Office documents → PDF with what the user already has installed: Microsoft
@@ -94,9 +95,13 @@ export function findSoffice(): Promise<string | null> {
 }
 
 // Which converter can take each kind of document, for the user-facing message.
+// Settings may prefer one of them; the other still steps in when missing.
 export async function converterFor(kind: OfficeApp): Promise<'office' | 'libreoffice' | null> {
-  if ((await officeCapabilities())[kind]) return 'office'
-  return (await findSoffice()) ? 'libreoffice' : null
+  const office = (await officeCapabilities())[kind]
+  const libre = (await findSoffice()) !== null
+  if (getSettings().office === 'libreoffice' && libre) return 'libreoffice'
+  if (office) return 'office'
+  return libre ? 'libreoffice' : null
 }
 
 // Single quotes inside a PowerShell single-quoted string are doubled.

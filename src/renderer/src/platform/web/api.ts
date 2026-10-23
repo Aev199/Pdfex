@@ -10,6 +10,34 @@ export function createWebApi(): PdfxApi {
   initLaunchQueue()
   return {
     platform: 'linux',
+    getSettings: async () => {
+      throw new Error('Settings live in the desktop app')
+    },
+    setSettings: async () => {
+      throw new Error('Settings live in the desktop app')
+    },
+    onSettings: () => () => {},
+    appInfo: async () => ({
+      version: 'web',
+      commit: '',
+      channel: 'web',
+      electron: '',
+      chrome: '',
+      node: '',
+      dataDir: '',
+      appDir: '',
+      canSelfUpdate: false,
+      previousVersion: null
+    }),
+    openDataFolder: async () => '',
+    updateState: async () => ({
+      phase: { kind: 'idle' },
+      dialog: false,
+      note: null,
+      applied: null
+    }),
+    updateAction: async () => {},
+    onUpdateState: () => () => {},
     rendererReady,
     chooseSavePath,
     readClipboardImage,
