@@ -25,6 +25,7 @@ interface FullViewChromeProps {
   // Editing is off on pages turned with Rotate (see FullView).
   editBlocked: string | null
   navByKey: (axis: 'x' | 'y', dir: 1 | -1) => void
+  onRotate: (delta: 90 | -90) => void
   commentsOpen: boolean
   // Open comments of the document.
   commentCount: number
@@ -51,6 +52,7 @@ export function FullViewChrome({
   onPrint,
   editBlocked,
   navByKey,
+  onRotate,
   commentsOpen,
   commentCount,
   onToggleComments
@@ -107,6 +109,22 @@ export function FullViewChrome({
             </>
           ) : (
             <>
+              <button
+                className="btn glass square"
+                title="Rotate left (Ctrl+Shift+−)"
+                aria-label="Rotate left"
+                onClick={() => onRotate(-90)}
+              >
+                <RotateIcon />
+              </button>
+              <button
+                className="btn glass square"
+                title="Rotate right (Ctrl+Shift++)"
+                aria-label="Rotate right"
+                onClick={() => onRotate(90)}
+              >
+                <RotateIcon clockwise />
+              </button>
               <button className="btn glass" title="Print (Ctrl+P)" onClick={onPrint}>
                 Print
               </button>
@@ -155,6 +173,25 @@ export function FullViewChrome({
 
       <PageJump pi={pi} pageCount={pageCount} onGo={goToPage} />
     </div>
+  )
+}
+
+function RotateIcon({ clockwise = false }: { clockwise?: boolean }): React.JSX.Element {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={clockwise ? { transform: 'scaleX(-1)' } : undefined}
+    >
+      <path d="M3 6.5A5.5 5.5 0 1 1 3.6 11" />
+      <path d="M2.5 2.5v4h4" />
+    </svg>
   )
 }
 

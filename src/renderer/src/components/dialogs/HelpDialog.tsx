@@ -26,6 +26,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       [`${MOD} + A`, 'Select all pages'],
       [`${MOD} + C  /  ${MOD} + V`, 'Copy the selected pages / paste after the selected page'],
       [`${MOD} + D`, 'Duplicate the selection'],
+      [`${MOD} + Shift + +  /  ${MOD} + Shift + -`, 'Rotate the selection right / left'],
       ['Delete', 'Delete the selection'],
       ['Drag a page', 'Move it; with ' + COPY_DRAG + ' held, copy it'],
       [`${MOD} + Z  /  ${MOD} + Y`, 'Undo / redo'],
@@ -40,6 +41,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       ['Home, End', 'First / last page of the document'],
       ['F4', 'Thumbnails and outline'],
       ['F6', 'Comments'],
+      [`${MOD} + Shift + +  /  ${MOD} + Shift + -`, 'Rotate the page right / left'],
       ['Page number', 'Type a number and press Enter'],
       [`${MOD} + C`, 'Copy the selected text'],
       ['Esc', 'Back to the canvas']

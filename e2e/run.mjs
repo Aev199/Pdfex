@@ -664,6 +664,47 @@ test('reader: thumbnails, page jump, rotation and printing', async () => {
   }
 })
 
+test('Ctrl+Shift+Plus and Minus rotate pages on the canvas and in the reader', async () => {
+  const { app, page } = await launch(freshData(), [files.second])
+  try {
+    await rendered(page)
+    const cells = page.locator('.canvas-world .page[data-page-id]')
+    const shape = async (locator) => {
+      const box = await locator.boundingBox()
+      return box.width > box.height ? 'landscape' : 'portrait'
+    }
+    assert.equal(await shape(cells.nth(1)), 'portrait')
+    await cells.nth(1).click()
+    await page.keyboard.press('Control+Shift+Equal')
+    await page.waitForTimeout(500)
+    assert.equal(await shape(cells.nth(1)), 'landscape')
+    await page.keyboard.press('Control+z')
+    await page.waitForTimeout(500)
+    assert.equal(await shape(cells.nth(1)), 'portrait')
+
+    await cells.first().dblclick()
+    await page.waitForTimeout(1000)
+    const current = page.locator('.full-page').first()
+    assert.equal(await shape(current), 'portrait')
+    await page.locator('.full-actions .btn[aria-label="Rotate right"]').click()
+    await page.waitForTimeout(600)
+    assert.equal(await shape(current), 'landscape')
+    await page.keyboard.press('Control+Shift+Minus')
+    await page.waitForTimeout(600)
+    assert.equal(await shape(current), 'portrait')
+    await page.keyboard.press('Control+Shift+Minus')
+    await page.waitForTimeout(600)
+    assert.equal(await shape(current), 'landscape')
+    // Still on the same page, and the canvas shows the turn after closing.
+    assert.equal(await page.locator('.full-count-input').inputValue(), '1')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    assert.equal(await shape(cells.first()), 'landscape')
+  } finally {
+    await app.close()
+  }
+})
+
 test('an Office document converts to PDF, or says what to install', async () => {
   const { app, page } = await launch(freshData(), [files.word])
   try {

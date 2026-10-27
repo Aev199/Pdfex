@@ -79,7 +79,6 @@ export function useCollection(
     setSelection(next ? [next] : [])
   }, [])
 
-
   const selectPage = useCallback(
     (docId: string, pageId: string, modifiers?: SelectModifiers) => {
       const target = { docId, pageId }
@@ -241,12 +240,26 @@ export function useCollection(
     [setDocs, currentSelection]
   )
 
+  // One page by id, wherever it is (the page open in the reader).
+  const rotatePage = useCallback(
+    (pageId: string, delta: 90 | -90) =>
+      setDocs((prev) => {
+        const doc = prev.find((d) => d.pages.some((p) => p.id === pageId))
+        return doc ? selOps.rotatePages(prev, [{ docId: doc.id, pageId }], delta) : prev
+      }),
+    [setDocs]
+  )
+
   const rotateDoc = useCallback(
     (docId: string, delta: 90 | -90) =>
       setDocs((prev) => {
         const doc = prev.find((d) => d.id === docId)
         return doc
-          ? selOps.rotatePages(prev, doc.pages.map((p) => ({ docId, pageId: p.id })), delta)
+          ? selOps.rotatePages(
+              prev,
+              doc.pages.map((p) => ({ docId, pageId: p.id })),
+              delta
+            )
           : prev
       }),
     [setDocs]
@@ -433,6 +446,7 @@ export function useCollection(
     replaceDocPages,
     swapSource,
     rotateSelection,
+    rotatePage,
     rotateDoc,
     copySelected,
     pasteAfterSelected,

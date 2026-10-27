@@ -5,7 +5,7 @@ const hasModifier = (event: KeyboardEvent): boolean =>
 
 export function onZoom(callback: (action: ZoomAction) => void): () => void {
   const listener = (event: KeyboardEvent): void => {
-    if (!hasModifier(event)) return
+    if (!hasModifier(event) || event.shiftKey) return
     const action: ZoomAction | null =
       event.key === '=' || event.key === '+'
         ? 'in'
