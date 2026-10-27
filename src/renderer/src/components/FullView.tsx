@@ -84,6 +84,8 @@ interface FullViewProps {
     pageHeight: number
   ) => void
   comments: CommentState
+  // Turn the current page (an undoable change of the document).
+  onRotate: (delta: 90 | -90) => void
   onActivePageChange: (pageId: string) => void
   onPrint: (pages: PageEntry[], title: string) => void
   onClose: () => void
@@ -127,6 +129,7 @@ export function FullView({
   onToggleTextMark,
   onUpdateText,
   comments,
+  onRotate,
   onActivePageChange,
   onPrint,
   onClose
@@ -527,6 +530,7 @@ export function FullView({
         onToggleSidebar={toggleSidebar}
         onPrint={print}
         editBlocked={editBlocked}
+        onRotate={onRotate}
         commentsOpen={commentsOpen}
         commentCount={openComments}
         onToggleComments={toggleComments}

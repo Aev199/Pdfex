@@ -10,6 +10,7 @@ import { createZoomStore } from './app/zoom-store'
 import { useFullView } from './app/useFullView'
 import { useMarks } from './app/useMarks'
 import { useComments } from './app/useComments'
+import { rotateKey } from './app/rotate-keys'
 import { CompareView } from './components/compare/CompareView'
 import type { ComparePage } from './components/compare/CompareView'
 import { useFormValues } from './app/useFormValues'
@@ -615,9 +616,39 @@ export function WorkspaceView({
     })
   }, [fullViewRef])
 
+  // Turn the page open in the reader, or the selected pages.
+  const { rotatePage, rotateSelection: rotateSelected, selectedRef } = collection
+  const { hiddenPageId } = fullViewState
+  const rotate = useCallback(
+    (delta: 90 | -90) => {
+      if (fullViewRef.current) {
+        if (hiddenPageId) rotatePage(hiddenPageId, delta)
+      } else if (selectedRef.current) {
+        rotateSelected(delta)
+      } else {
+        flash('Select the pages to rotate')
+      }
+    },
+    [fullViewRef, hiddenPageId, rotatePage, rotateSelected, selectedRef, flash]
+  )
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const delta = rotateKey(event)
+      if (!delta) return
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+      event.preventDefault()
+      rotate(delta)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [rotate])
+
   useEffect(() => {
     return window.api.onMenu((action) => {
-      if (action === 'open') void openViaDialog()
+      if (action === 'rotate-right') rotate(90)
+      else if (action === 'rotate-left') rotate(-90)
+      else if (action === 'open') void openViaDialog()
       else if (action === 'export-pdfx') void exportCollection('pdfx')
       else if (action === 'export-pdf') void exportCollection('pdf')
       else if (action === 'export-zip') void exportZip()
@@ -630,6 +661,7 @@ export function WorkspaceView({
       }
     })
   }, [
+    rotate,
     openViaDialog,
     exportCollection,
     exportZip,
@@ -755,6 +787,7 @@ export function WorkspaceView({
               onToggleTextMark={elementState.toggleTextMark}
               onUpdateText={elementState.updateText}
               comments={commentState}
+              onRotate={rotate}
               onActivePageChange={fullViewState.setHiddenPageId}
               onPrint={(pages, title) => void printPages(pages, title)}
               onClose={fullViewState.closeFullView}

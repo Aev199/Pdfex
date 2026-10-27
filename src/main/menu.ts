@@ -63,6 +63,21 @@ export function buildMenu(): void {
           click: sendZoom('reset')
         },
         { type: 'separator' },
+        // The keys are read in the page (by key position, so they work in any
+        // keyboard layout); the menu only shows them.
+        {
+          label: 'Rotate Right',
+          accelerator: 'CommandOrControl+Shift+=',
+          registerAccelerator: false,
+          click: sendMenu('rotate-right')
+        },
+        {
+          label: 'Rotate Left',
+          accelerator: 'CommandOrControl+Shift+-',
+          registerAccelerator: false,
+          click: sendMenu('rotate-left')
+        },
+        { type: 'separator' },
         {
           label: 'Toggle Developer Tools',
           accelerator: process.platform === 'darwin' ? 'Alt+Command+I' : 'Ctrl+Shift+I',

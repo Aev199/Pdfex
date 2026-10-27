@@ -84,6 +84,8 @@ export type MenuAction =
   | 'shortcuts'
   | 'check-updates'
   | 'about'
+  | 'rotate-right'
+  | 'rotate-left'
 
 export interface SaveFilter {
   name: string
