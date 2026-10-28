@@ -726,6 +726,7 @@ test('files and pictures copied in other programs paste as documents', async () 
         [files.second, files.drawing].map((f) => pathToFileURL(f).href).join('\r\n')
       )
     }
+    await page.waitForFunction(async () => (await window.api.readClipboardFiles()).length === 2)
     // Nothing selected: they become new documents (with a page selected
     // they go after it).
     await page.keyboard.press('Escape')
@@ -750,6 +751,10 @@ test('files and pictures copied in other programs paste as documents', async () 
         new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })
       ])
     })
+    // The system clipboard may take a moment to offer what was written.
+    await page.waitForFunction(
+      async () => ((await window.api.readClipboardImage())?.length ?? 0) > 0
+    )
     await page.keyboard.press('Escape')
     await page.keyboard.press('Control+v')
     await page.waitForFunction(() => document.querySelectorAll('.doc-name').length === 4, null, {
@@ -870,7 +875,9 @@ test('settings persist; help, about and an update from a folder', async () => {
 })
 
 let failed = 0
-for (const { name, fn } of tests) {
+// E2E_ONLY=<part of a name> runs just the matching scenarios.
+const only = process.env.E2E_ONLY
+for (const { name, fn } of tests.filter((t) => !only || t.name.includes(only))) {
   const t0 = Date.now()
   try {
     await fn()

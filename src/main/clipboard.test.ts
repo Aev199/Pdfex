@@ -1,3 +1,5 @@
+import { resolve } from 'path'
+import { pathToFileURL } from 'url'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({ clipboard: {} }))
@@ -6,9 +8,10 @@ const { dropFiles, fileUrlPaths } = await import('./clipboard')
 
 describe('clipboard file lists', () => {
   it('reads file URLs, one per line', () => {
-    expect(
-      fileUrlPaths('file:///tmp/a%20b.pdf\r\nfile:///tmp/c.pdf\n# comment\nhttps://x')
-    ).toEqual(['/tmp/a b.pdf', '/tmp/c.pdf'])
+    const a = resolve('a b.pdf')
+    const c = resolve('Отчёт.pdf')
+    const list = `${pathToFileURL(a).href}\r\n${pathToFileURL(c).href}\n# comment\nhttps://x`
+    expect(fileUrlPaths(list)).toEqual([a, c])
   })
 
   it("reads Explorer's DROPFILES list", () => {
