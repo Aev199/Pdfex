@@ -495,6 +495,8 @@ test('an exported scan gets its recognized text as an invisible layer', async ()
   let run = await launch(freshData(), [])
   let png
   try {
+    // Draw only once the app has settled, not while the window still loads.
+    await run.page.waitForSelector('.tab-name')
     png = await run.page.evaluate(() => {
       const canvas = document.createElement('canvas')
       canvas.width = 1240
