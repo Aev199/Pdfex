@@ -711,8 +711,33 @@ test('Ctrl+Shift+Plus and Minus rotate pages on the canvas and in the reader', a
 
 test('files and pictures copied in other programs paste as documents', async () => {
   const { app, page } = await launch(freshData(), [files.report])
+  // Counted in the toolbar: the canvas only draws the rows in view.
+  const totals = () => page.locator('.toolbar-meta').textContent()
   try {
     await rendered(page)
+    assert.match(await totals(), /1 document.*12 pages/)
+
+    // A picture (a screenshot, a copied image) becomes a one-page document.
+    await app.evaluate(
+      async ({ clipboard, ClipboardItem, nativeImage }, file) => {
+        const png = nativeImage.createFromPath(file).toPNG()
+        await clipboard.write([
+          new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })
+        ])
+      },
+      join(import.meta.dirname, '..', 'resources', 'apple-touch-icon.png')
+    )
+    // The system clipboard may take a moment to offer what was written.
+    await page.waitForFunction(
+      async () => ((await window.api.readClipboardImage())?.length ?? 0) > 0
+    )
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Control+v')
+    await page.waitForFunction(() => document.querySelectorAll('.doc-name').length === 2, null, {
+      timeout: 15000
+    })
+    assert.match(await totals(), /2 documents.*13 pages/)
+
     // Files copied in Explorer (on Windows the real Explorer format), or a
     // file manager's URI list elsewhere.
     if (process.platform === 'win32') {
@@ -733,35 +758,14 @@ test('files and pictures copied in other programs paste as documents', async () 
     // they go after it).
     await page.keyboard.press('Escape')
     await page.keyboard.press('Control+v')
-    await page.waitForFunction(() => document.querySelectorAll('.doc-name').length === 3, null, {
-      timeout: 15000
-    })
-    assert.deepEqual((await texts(page, '.doc-name')).slice(1).sort(), [
-      'КЖ лист 1',
-      'Расчёт MIDAS'
-    ])
-
-    // A picture (a screenshot, a copied image) becomes a one-page document.
-    await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
-      const png = nativeImage
-        .createFromDataURL(
-          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mP8z8DwnwEIGBkZGRkYAAAvAAT/0hBMvwAAAABJRU5ErkJggg=='
-        )
-        .resize({ width: 400, height: 300 })
-        .toPNG()
-      await clipboard.write([
-        new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })
-      ])
-    })
-    // The system clipboard may take a moment to offer what was written.
-    await page.waitForFunction(
-      async () => ((await window.api.readClipboardImage())?.length ?? 0) > 0
-    )
-    await page.keyboard.press('Escape')
-    await page.keyboard.press('Control+v')
     await page.waitForFunction(() => document.querySelectorAll('.doc-name').length === 4, null, {
       timeout: 15000
     })
+    assert.deepEqual((await texts(page, '.doc-name')).slice(2).sort(), [
+      'КЖ лист 1',
+      'Расчёт MIDAS'
+    ])
+    assert.match(await totals(), /4 documents.*17 pages/)
 
     // Text still pastes into text fields; a file list there is ignored, not
     // a crash.
