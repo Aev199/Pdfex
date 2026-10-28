@@ -1,4 +1,5 @@
-import { Menu } from 'electron'
+import { Menu, webContents } from 'electron'
+import { safePaste } from './clipboard'
 import { getMainWindow, toggleDevTools } from './window'
 
 export function buildMenu(): void {
@@ -40,7 +41,29 @@ export function buildMenu(): void {
         process.platform === 'darwin' ? { role: 'close' as const } : { role: 'quit' as const }
       ]
     },
-    { role: 'editMenu' },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        {
+          label: 'Paste',
+          accelerator: 'CommandOrControl+V',
+          // The page takes the key itself (see paste-guard in the renderer).
+          registerAccelerator: false,
+          click: () => {
+            const contents = webContents.getFocusedWebContents() ?? getMainWindow()?.webContents
+            if (contents) void safePaste(contents)
+          }
+        },
+        { role: 'delete' },
+        { type: 'separator' },
+        { role: 'selectAll' }
+      ]
+    },
     {
       label: 'View',
       submenu: [

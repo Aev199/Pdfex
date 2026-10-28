@@ -43,6 +43,9 @@ export function createWebApi(): PdfxApi {
     readClipboardImage,
     readClipboardFiles: async () => [],
     clearClipboard,
+    pasteText: async () => {
+      document.execCommand('paste')
+    },
     getPathForFile: () => '',
     expandDropPaths: async () => [],
     readSource: async () => null,

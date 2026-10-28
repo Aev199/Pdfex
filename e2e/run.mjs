@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { execFileSync } from 'node:child_process'
 import { PDFDocument, PDFName, rgb } from 'pdf-lib'
 import { inflateSync } from 'node:zlib'
 import { createHash } from 'node:crypto'
@@ -700,6 +702,75 @@ test('Ctrl+Shift+Plus and Minus rotate pages on the canvas and in the reader', a
     await page.keyboard.press('Escape')
     await page.waitForTimeout(800)
     assert.equal(await shape(cells.first()), 'landscape')
+  } finally {
+    await app.close()
+  }
+})
+
+test('files and pictures copied in other programs paste as documents', async () => {
+  const { app, page } = await launch(freshData(), [files.report])
+  try {
+    await rendered(page)
+    // Files copied in Explorer (on Windows the real Explorer format), or a
+    // file manager's URI list elsewhere.
+    if (process.platform === 'win32') {
+      execFileSync('powershell.exe', [
+        '-NoProfile',
+        '-Command',
+        `Set-Clipboard -Path '${files.second}', '${files.drawing}'`
+      ])
+    } else {
+      await app.evaluate(
+        ({ clipboard, ClipboardItem }, urls) =>
+          clipboard.write([new ClipboardItem({ 'text/uri-list': urls })]),
+        [files.second, files.drawing].map((f) => pathToFileURL(f).href).join('\r\n')
+      )
+    }
+    // Nothing selected: they become new documents (with a page selected
+    // they go after it).
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Control+v')
+    await page.waitForFunction(() => document.querySelectorAll('.doc-name').length === 3, null, {
+      timeout: 15000
+    })
+    assert.deepEqual((await texts(page, '.doc-name')).slice(1).sort(), [
+      'КЖ лист 1',
+      'Расчёт MIDAS'
+    ])
+
+    // A picture (a screenshot, a copied image) becomes a one-page document.
+    await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
+      const png = nativeImage
+        .createFromDataURL(
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mP8z8DwnwEIGBkZGRkYAAAvAAT/0hBMvwAAAABJRU5ErkJggg=='
+        )
+        .resize({ width: 400, height: 300 })
+        .toPNG()
+      await clipboard.write([
+        new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })
+      ])
+    })
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Control+v')
+    await page.waitForFunction(() => document.querySelectorAll('.doc-name').length === 4, null, {
+      timeout: 15000
+    })
+
+    // Text still pastes into text fields; a file list there is ignored, not
+    // a crash.
+    await page.keyboard.press('Control+f')
+    const field = page.locator('.findbar-input')
+    await app.evaluate(({ clipboard }) => clipboard.writeText('грунт'))
+    await page.keyboard.press('Control+v')
+    await page.waitForFunction(() => document.activeElement?.value === 'грунт')
+    await app.evaluate(
+      ({ clipboard, ClipboardItem }, url) =>
+        clipboard.write([new ClipboardItem({ 'text/uri-list': url })]),
+      pathToFileURL(files.second).href
+    )
+    await page.keyboard.press('Control+v')
+    await page.waitForTimeout(500)
+    assert.equal(await field.inputValue(), 'грунт')
   } finally {
     await app.close()
   }

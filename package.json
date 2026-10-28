@@ -20,7 +20,7 @@
     "build:web": "yarn typecheck:web && vite build --config vite.config.web.ts",
     "preview:web": "vite preview --config vite.config.web.ts",
     "build": "yarn typecheck && electron-vite build",
-    "postinstall": "electron-builder install-app-deps && yarn build:native && node scripts/copy-ocr-assets.mjs && node scripts/copy-pdf-assets.mjs",
+    "postinstall": "install-electron && electron-builder install-app-deps && yarn build:native && node scripts/copy-ocr-assets.mjs && node scripts/copy-pdf-assets.mjs",
     "build:unpack": "yarn build && electron-builder --dir",
     "build:win": "yarn build && node scripts/stamp-version.mjs && electron-builder --win",
     "build:mac": "electron-vite build && electron-builder --mac",
@@ -52,7 +52,7 @@
     "d3-selection": "3.0.0",
     "d3-zoom": "3.0.0",
     "dejavu-fonts-ttf": "2.37.3",
-    "electron": "38.4.0",
+    "electron": "44.10.0",
     "electron-builder": "25.1.8",
     "electron-vite": "4.0.1",
     "fflate": "0.8.3",
@@ -71,5 +71,8 @@
     "vite": "7.3.5",
     "vitest": "3.2.4",
     "zod": "4.4.3"
+  },
+  "resolutions": {
+    "tar": "7.5.22"
   }
 }

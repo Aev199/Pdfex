@@ -121,6 +121,8 @@ const api = {
     ipcRenderer.invoke('pdfx:read-clipboard-image'),
   readClipboardFiles: (): Promise<OpenedFile[]> => ipcRenderer.invoke('pdfx:read-clipboard-files'),
   clearClipboard: (): Promise<void> => ipcRenderer.invoke('pdfx:clipboard-clear'),
+  // Paste into the focused text field, unless the clipboard holds files.
+  pasteText: (): Promise<void> => ipcRenderer.invoke('pdfx:paste-text'),
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   expandDropPaths: (paths: string[]): Promise<OpenedFile[]> =>
     ipcRenderer.invoke('pdfx:expand-drop-paths', paths),
