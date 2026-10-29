@@ -67,6 +67,11 @@ function Guide(): React.JSX.Element {
     <div className="help-guide">
       <h3>Opening files</h3>
       <p>
+        On Windows, Settings → PDF files offers PDFx for PDFs (Open with, the Explorer menu) and
+        Make default… picks it as the PDF program. File → Open Recent lists the files opened lately.
+        A password-protected PDF asks for its password; its exported copies are not protected.
+      </p>
+      <p>
         Drop PDFs, images or Word, Excel and PowerPoint documents onto the window or onto pdfx.exe,
         or use File → Open. Office files are converted to PDF by Microsoft Office when it is
         installed, otherwise by LibreOffice; macros stay off and nothing leaves the computer.
@@ -81,9 +86,12 @@ function Guide(): React.JSX.Element {
       <h3>Reading</h3>
       <p>
         Double-click a page to read it full screen. Pages follow each other top to bottom: the mouse
-        wheel turns one page per notch, a touchpad scrolls. F4 shows thumbnails or the outline,
-        links work, text can be selected and copied. Large drawings are redrawn sharply after
-        zooming, up to 9000%.
+        wheel turns one page per notch, a touchpad scrolls. The buttons next to the title switch to
+        one long scroll fitted to the width or to two pages side by side ({MOD} + wheel zooms
+        there). F4 shows thumbnails, the outline or the drawing&apos;s layers (hide dimensions,
+        hatching…; exports keep hidden layers switched off). Opening a file again offers to continue
+        at the page where you stopped. Links work, text can be selected and copied. Large drawings
+        are redrawn sharply after zooming, up to 9000%.
       </p>
       <h3>Annotations</h3>
       <p>
@@ -106,8 +114,11 @@ function Guide(): React.JSX.Element {
         page, pins a comment there; others can reply, edit, resolve or delete. Resolved comments
         leave the page (Show resolved brings them back), and the eye hides all pins. Comments are
         not part of the page: they are saved with the session and exported as PDF sticky notes with
-        their replies, which Acrobat and other viewers show as a conversation. Your name is set in
-        Settings.
+        their replies, which Acrobat and other viewers show as a conversation. Comments already in a
+        PDF (from Acrobat, Foxit…) appear in the panel too and can be answered and resolved; they
+        stay in the file as they were. Your name is set in Settings. Settings → Export can also save
+        marks and drawings as annotations others can move or delete, instead of drawing them into
+        the page.
       </p>
       <h3>Comparing revisions</h3>
       <p>
