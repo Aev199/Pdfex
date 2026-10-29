@@ -11,6 +11,7 @@ import { useFullView } from './app/useFullView'
 import { useMarks } from './app/useMarks'
 import { useComments } from './app/useComments'
 import { rotateKey } from './app/rotate-keys'
+import { lastPosition, rememberPosition } from './app/reading-positions'
 import { CompareView } from './components/compare/CompareView'
 import type { ComparePage } from './components/compare/CompareView'
 import { useFormValues } from './app/useFormValues'
@@ -141,6 +142,40 @@ export function WorkspaceView({
     [collection, markState, elementState, commentState, formState, undoStack, initial.view, flash]
   )
   const fullViewState = useFullView()
+  const openPageRef = useRef(fullViewState.openPage)
+  openPageRef.current = fullViewState.openPage
+
+  // Where each file was last read, and an offer to continue there when it is
+  // opened again (documents already here when the tab mounts don't ask).
+  const readingPage = fullViewState.fullView ? fullViewState.hiddenPageId : null
+  useEffect(() => {
+    if (!readingPage) return
+    for (const doc of collection.docsRef.current) {
+      const page = doc.pages.find((p) => p.id === readingPage)
+      if (page?.source.path) rememberPosition(page.source.path, page.pageIndex)
+    }
+  }, [readingPage, collection.docsRef])
+  const seenDocs = useRef(new Set(initial.docs.map((d) => d.id)))
+  const [resume, setResume] = useState<{
+    docId: string
+    pageId: string
+    name: string
+    number: number
+  } | null>(null)
+  useEffect(() => {
+    for (const doc of collection.docs) {
+      if (seenDocs.current.has(doc.id)) continue
+      seenDocs.current.add(doc.id)
+      const path = doc.pages[0]?.source.path
+      const at = path ? lastPosition(path) : null
+      if (!at) continue
+      const index = doc.pages.findIndex((p) => p.source.path === path && p.pageIndex === at)
+      if (index > 0) {
+        setResume({ docId: doc.id, pageId: doc.pages[index].id, name: doc.name, number: index + 1 })
+      }
+    }
+    setResume((r) => (r && !collection.docs.some((d) => d.id === r.docId) ? null : r))
+  }, [collection.docs])
   const docs = collection.docs
 
   const searchIndex = useSearchIndex(docs, elementState.elements)
@@ -280,8 +315,25 @@ export function WorkspaceView({
             }
       )
     }
+    if (resume) {
+      list.push({
+        id: `resume:${resume.docId}`,
+        text: `"${resume.name}": continue reading at page ${resume.number}?`,
+        actions: [
+          {
+            label: `Open page ${resume.number}`,
+            primary: true,
+            onClick: () => {
+              setResume(null)
+              openPageRef.current(resume.docId, resume.pageId)
+            }
+          },
+          { label: 'No', onClick: () => setResume(null) }
+        ]
+      })
+    }
     return list
-  }, [missing, sourceWatch, relink])
+  }, [missing, sourceWatch, relink, resume])
 
   const { exportCollection, exportPages, exportZip, buildPagesPdf, hasEdits } = useExport(
     docs,

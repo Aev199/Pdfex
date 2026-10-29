@@ -35,6 +35,8 @@ interface UpdaterMemory {
   checkedAt?: number
   // The open command last written for "Open PDFs in PDFx" (Windows).
   associatedCommand?: string
+  // File → Open Recent, newest first.
+  recentFiles?: string[]
 }
 
 interface Stored extends Settings, UpdaterMemory {}
@@ -69,6 +71,9 @@ export function sanitize(raw: unknown): Stored {
   if (typeof input.checkedAt === 'number') result.checkedAt = input.checkedAt
   if (typeof input.associatedCommand === 'string')
     result.associatedCommand = input.associatedCommand
+  if (Array.isArray(input.recentFiles)) {
+    result.recentFiles = input.recentFiles.filter((p): p is string => typeof p === 'string')
+  }
   return result
 }
 
@@ -97,7 +102,13 @@ function persist(): Promise<void> {
 }
 
 export function getSettings(): Settings {
-  const { skippedVersion: _s, checkedAt: _c, associatedCommand: _a, ...settings } = load()
+  const {
+    skippedVersion: _s,
+    checkedAt: _c,
+    associatedCommand: _a,
+    recentFiles: _r,
+    ...settings
+  } = load()
   return settings
 }
 
@@ -115,8 +126,8 @@ export function onSettingsChanged(listener: (settings: Settings) => void): () =>
 }
 
 export function updaterMemory(): UpdaterMemory {
-  const { skippedVersion, checkedAt, associatedCommand } = load()
-  return { skippedVersion, checkedAt, associatedCommand }
+  const { skippedVersion, checkedAt, associatedCommand, recentFiles } = load()
+  return { skippedVersion, checkedAt, associatedCommand, recentFiles }
 }
 
 export function rememberForUpdater(patch: UpdaterMemory): void {

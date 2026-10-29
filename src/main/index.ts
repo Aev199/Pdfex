@@ -1,4 +1,5 @@
 import { app, dialog, nativeTheme, BrowserWindow } from 'electron'
+import { onRecentChanged } from './recent'
 import { initFileAssociation } from './file-association'
 import { join } from 'path'
 import { existsSync } from 'fs'
@@ -74,6 +75,7 @@ if (!gotLock) {
     )
 
     buildMenu()
+    onRecentChanged(buildMenu)
     createWindow()
     void initUpdater(dataLocation.kind === 'portable')
     initFileAssociation()

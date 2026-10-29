@@ -905,6 +905,41 @@ test('reader layouts: scroll by width, two pages, back to one at a time for edit
   }
 })
 
+test('Open Recent reopens a file and offers to continue where reading stopped', async () => {
+  const { app, page } = await launch(freshData(), [files.report])
+  const recent = () =>
+    app.evaluate(({ Menu }) => {
+      const file = Menu.getApplicationMenu().items.find((i) => i.label === 'File')
+      const item = file.submenu.items.find((i) => i.label === 'Open Recent')
+      return item.submenu.items.map((i) => i.label)
+    })
+  try {
+    await rendered(page)
+    assert.match((await recent())[0], /Технический отчёт ИГИ\.pdf/)
+    await page.locator('.canvas-world .page[data-page-id]').nth(4).dblclick()
+    await page.waitForTimeout(1000)
+    assert.equal(await page.locator('.full-count-input').inputValue(), '5')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await page.locator('.doc-name').first().click({ button: 'right' })
+    await clickMenuItem(page, 'Remove document')
+    await page.waitForFunction(() => document.querySelectorAll('.doc-name').length === 0)
+
+    await app.evaluate(({ Menu }) => {
+      const file = Menu.getApplicationMenu().items.find((i) => i.label === 'File')
+      const item = file.submenu.items.find((i) => i.label === 'Open Recent')
+      item.submenu.items[0].click()
+    })
+    const offer = page.locator('.notice', { hasText: 'continue reading at page 5' })
+    await offer.waitFor()
+    await offer.locator('.notice-btn', { hasText: 'Open page 5' }).click()
+    await page.waitForTimeout(1000)
+    assert.equal(await page.locator('.full-count-input').inputValue(), '5')
+  } finally {
+    await app.close()
+  }
+})
+
 test('an Office document converts to PDF, or says what to install', async () => {
   const { app, page } = await launch(freshData(), [files.word])
   try {
