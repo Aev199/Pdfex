@@ -13,12 +13,18 @@ interface DragControllerDeps {
   movePageToNewDoc: (source: PageRef, docIndex: number) => void
   copyPageInto: (source: PageRef, targetDocId: string, index: number) => void
   copyPageToNewDoc: (source: PageRef, docIndex: number) => void
+  moveGroupInto: (refs: PageRef[], grabbedId: string, targetDocId: string, index: number) => void
+  moveGroupToNewDoc: (refs: PageRef[], grabbed: PageRef, docIndex: number) => void
+  copyGroupInto: (refs: PageRef[], targetDocId: string, index: number) => void
+  copyGroupToNewDoc: (refs: PageRef[], grabbed: PageRef, docIndex: number) => void
   onExternalDrop: (files: IncomingFile[], target: DropTarget | null) => void
 }
 
 export function useDragController(deps: DragControllerDeps) {
   const [dragKind, setDragKind] = useState<'internal' | 'external' | null>(null)
   const [draggingPage, setDraggingPage] = useState<PageRef | null>(null)
+  // Every selected page when the grabbed one is part of a selection.
+  const [group, setGroup] = useState<PageRef[] | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [collapsedId, setCollapsedId] = useState<string | null>(null)
   const [externalCount, setExternalCount] = useState(0)
@@ -52,6 +58,7 @@ export function useDragController(deps: DragControllerDeps) {
     dragDepth.current = 0
     setDragKind(null)
     setDraggingPage(null)
+    setGroup(null)
     setDropTarget(null)
     setExternalCount(0)
     setCollapsedId(null)
@@ -67,9 +74,10 @@ export function useDragController(deps: DragControllerDeps) {
     }, DRAG_WATCHDOG_MS)
   }, [clearDrag])
 
-  const startPageDrag = useCallback((docId: string, pageId: string) => {
+  const startPageDrag = useCallback((docId: string, pageId: string, selection?: PageRef[]) => {
     setDragKind('internal')
     setDraggingPage({ docId, pageId })
+    setGroup(selection && selection.length > 1 ? selection : null)
   }, [])
 
   useEffect(() => {
@@ -94,6 +102,7 @@ export function useDragController(deps: DragControllerDeps) {
     canvasRef: deps.canvasRef,
     dragKind,
     draggingPage,
+    group,
     dropTarget,
     collapsedId: copying || home ? null : collapsedId,
     externalCount,
@@ -108,6 +117,10 @@ export function useDragController(deps: DragControllerDeps) {
     movePageToNewDoc: deps.movePageToNewDoc,
     copyPageInto: deps.copyPageInto,
     copyPageToNewDoc: deps.copyPageToNewDoc,
+    moveGroupInto: deps.moveGroupInto,
+    moveGroupToNewDoc: deps.moveGroupToNewDoc,
+    copyGroupInto: deps.copyGroupInto,
+    copyGroupToNewDoc: deps.copyGroupToNewDoc,
     setCopying,
     setHome,
     onExternalDrop: deps.onExternalDrop
@@ -120,6 +133,8 @@ export function useDragController(deps: DragControllerDeps) {
     collapsedId: copying || home ? null : collapsedId,
     // The lifted page while it still stands in its place.
     liftedId: dragKind === 'internal' && (home || copying) ? (draggingPage?.pageId ?? null) : null,
+    // Several pages travel together (they are shown lifted).
+    draggingGroup: dragKind === 'internal' && group !== null,
     externalCount,
     committing,
     startPageDrag,

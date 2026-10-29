@@ -420,6 +420,14 @@ export function WorkspaceView({
     [annotateCopy, copyPageToDoc]
   )
 
+  const { copyGroupInto: copyGroupIntoDoc, copyGroupToNewDoc: copyGroupToDoc } = collection
+  const annotateCopies = useCallback(
+    (origins: Map<string, string>) => {
+      copyMarksFrom(origins)
+      copyElementsFrom(origins)
+    },
+    [copyMarksFrom, copyElementsFrom]
+  )
   const drag = useDragController({
     layout,
     canvasRef,
@@ -427,8 +435,28 @@ export function WorkspaceView({
     movePageToNewDoc: collection.movePageToNewDoc,
     copyPageInto,
     copyPageToNewDoc,
+    moveGroupInto: collection.moveGroupInto,
+    moveGroupToNewDoc: collection.moveGroupToNewDoc,
+    copyGroupInto: (refs, docId, index) => annotateCopies(copyGroupIntoDoc(refs, docId, index)),
+    copyGroupToNewDoc: (refs, grabbed, docIndex) =>
+      annotateCopies(copyGroupToDoc(refs, grabbed, docIndex)),
     onExternalDrop: handleExternalDropFiles
   })
+
+  // A page dragged from inside a selection of several takes them all along;
+  // returns how many travel (for the drag picture).
+  const { startPageDrag: beginDrag } = drag
+  const { currentSelection: selectionNow } = collection
+  const startPageDrag = useCallback(
+    (docId: string, pageId: string): number => {
+      const selection = selectionNow()
+      const group =
+        selection.length > 1 && selection.some((r) => r.pageId === pageId) ? selection : undefined
+      beginDrag(docId, pageId, group)
+      return group?.length ?? 1
+    },
+    [beginDrag, selectionNow]
+  )
 
   const onPaste = useCallback(() => void handlePaste(), [handlePaste])
   const { undo: popUndo, redo: popRedo } = undoStack
@@ -829,7 +857,8 @@ export function WorkspaceView({
             onHoverDoc={onHoverDoc}
             onDocDragOut={startDocDragOut}
             onOpenPage={fullViewState.openPage}
-            onPageDragStart={drag.startPageDrag}
+            onPageDragStart={startPageDrag}
+            draggingGroup={drag.draggingGroup}
             onPageDragEnd={drag.clearDrag}
             onAddPage={addPagesToDoc}
             onMoveDoc={collection.moveDoc}

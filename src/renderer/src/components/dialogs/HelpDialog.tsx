@@ -28,7 +28,10 @@ const SHORTCUTS: [string, [string, string][]][] = [
       [`${MOD} + D`, 'Duplicate the selection'],
       [`${MOD} + Shift + +  /  ${MOD} + Shift + -`, 'Rotate the selection right / left'],
       ['Delete', 'Delete the selection'],
-      ['Drag a page', 'Move it; with ' + COPY_DRAG + ' held, copy it'],
+      [
+        'Drag a page',
+        'Move it (a selected one takes the whole selection); with ' + COPY_DRAG + ' held, copy'
+      ],
       [`${MOD} + Z  /  ${MOD} + Y`, 'Undo / redo'],
       [`${MOD} + F`, 'Find in all documents of the tab'],
       ['Esc', 'Clear the selection']

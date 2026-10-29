@@ -129,6 +129,52 @@ test('page menu, multi-select, undo and redo', async () => {
   }
 })
 
+test('selected pages drag together: move, Ctrl-copy and undo', async () => {
+  const { app, page } = await launch(freshData(), [files.report, files.second])
+  try {
+    await rendered(page)
+    const all = page.locator('.canvas-world .page[data-page-id]')
+    const ids = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('.canvas-doc')].map((d) =>
+          [...d.querySelectorAll('.page[data-page-id]')].map((p) => p.dataset.pageId)
+        )
+      )
+    const start = await ids()
+    const [a, b] = [start[0][0], start[0][2]]
+    await all.nth(0).click()
+    await all.nth(2).click({ modifiers: ['Control'] })
+    assert.equal(await page.locator('.page.selected').count(), 2)
+
+    // Grabbing either selected page takes both, in document order.
+    await all.nth(2).dragTo(all.last())
+    await page.waitForTimeout(400)
+    let now = await ids()
+    assert.equal(now[0].length, start[0].length - 2)
+    assert.equal(now[1].length, start[1].length + 2)
+    const at = now[1].indexOf(a)
+    assert.ok(at >= 0 && now[1][at + 1] === b, 'moved together, in order')
+    assert.equal(await page.locator('.page.selected').count(), 2)
+
+    await page.keyboard.press('Control+z')
+    await page.waitForTimeout(400)
+    assert.deepEqual(await ids(), start)
+
+    // Ctrl-drag copies the whole selection and leaves the originals.
+    await all.nth(0).click()
+    await all.nth(2).click({ modifiers: ['Control'] })
+    await page.keyboard.down('Control')
+    await all.nth(0).dragTo(all.last())
+    await page.keyboard.up('Control')
+    await page.waitForTimeout(400)
+    now = await ids()
+    assert.deepEqual(now[0], start[0])
+    assert.equal(now[1].length, start[1].length + 2)
+  } finally {
+    await app.close()
+  }
+})
+
 test('tabs and camera survive a restart, and a crash', async () => {
   const data = freshData()
   let run = await launch(data, [files.report, files.second, files.drawing])

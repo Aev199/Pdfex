@@ -35,6 +35,8 @@ interface CollectionCanvasProps {
   dropTarget: DropTarget | null
   collapsedId: string | null
   liftedId: string | null
+  // Several selected pages are being dragged together.
+  draggingGroup: boolean
   externalCount: number
   pendingImports: PendingImport[]
   canvasRef: React.Ref<CanvasHandle>
@@ -49,7 +51,7 @@ interface CollectionCanvasProps {
   onHoverDoc: (docId: string | null) => void
   onDocDragOut: (docId: string) => void
   onOpenPage: (docId: string, pageId: string) => void
-  onPageDragStart: (docId: string, pageId: string) => void
+  onPageDragStart: (docId: string, pageId: string) => number | void
   onPageDragEnd: () => void
   onAddPage: (docId: string) => void
   onMoveDoc: (docId: string, direction: -1 | 1) => void
@@ -117,6 +119,7 @@ export function CollectionCanvas(props: CollectionCanvasProps): React.JSX.Elemen
         pagesDraggable={props.pagesDraggable}
         collapsedId={props.collapsedId}
         liftedId={props.liftedId}
+        draggingGroup={props.draggingGroup}
         draggingPage={draggingPage}
         hiddenPageId={props.hiddenPageId}
         marks={props.marks}
