@@ -44,6 +44,36 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
         <p className="settings-hint">Touchpad gestures work the same either way.</p>
       </section>
 
+      {window.api.platform === 'win32' && (
+        <section className="settings-section">
+          <h3>PDF files</h3>
+          <label className="settings-choice">
+            <input
+              type="checkbox"
+              checked={settings.openPdfs}
+              onChange={(e) => void changeSettings({ openPdfs: e.target.checked })}
+            />
+            <span>Open PDFs in PDFx (Open with and the Explorer menu)</span>
+          </label>
+          <div className="settings-row">
+            <span className="settings-hint">
+              Windows lets only you choose the default PDF program.
+            </span>
+            <button
+              className="btn"
+              disabled={!settings.openPdfs}
+              onClick={() => void window.api.openDefaultApps()}
+            >
+              Make default…
+            </button>
+          </div>
+          <p className="settings-hint">
+            Written for your Windows account only, no administrator rights needed; turning it off
+            removes it.
+          </p>
+        </section>
+      )}
+
       <section className="settings-section">
         <h3>Start</h3>
         <label className="settings-choice">

@@ -21,6 +21,8 @@ export interface Settings {
   commentAuthor: string
   // Exported scans get their recognized text as an invisible layer.
   exportOcr: boolean
+  // Windows: PDFx is offered for PDFs (Open with, Explorer menu).
+  openPdfs: boolean
 }
 
 export interface AppInfo {

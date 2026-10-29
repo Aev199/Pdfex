@@ -30,6 +30,7 @@ export function createWebApi(): PdfxApi {
       previousVersion: null
     }),
     openDataFolder: async () => '',
+    openDefaultApps: async () => {},
     updateState: async () => ({
       phase: { kind: 'idle' },
       dialog: false,

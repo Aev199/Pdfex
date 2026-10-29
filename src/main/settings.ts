@@ -16,7 +16,8 @@ export const DEFAULT_SETTINGS: Settings = {
   office: 'auto',
   restoreSession: true,
   commentAuthor: '',
-  exportOcr: true
+  exportOcr: true,
+  openPdfs: false
 }
 
 // The Windows account name signs comments until the user picks a name.
@@ -32,6 +33,8 @@ function accountName(): string {
 interface UpdaterMemory {
   skippedVersion?: string
   checkedAt?: number
+  // The open command last written for "Open PDFs in PDFx" (Windows).
+  associatedCommand?: string
 }
 
 interface Stored extends Settings, UpdaterMemory {}
@@ -59,10 +62,13 @@ export function sanitize(raw: unknown): Stored {
       typeof input.commentAuthor === 'string' && input.commentAuthor.trim()
         ? input.commentAuthor.trim().slice(0, 60)
         : accountName(),
-    exportOcr: pick('exportOcr', (v) => typeof v === 'boolean')
+    exportOcr: pick('exportOcr', (v) => typeof v === 'boolean'),
+    openPdfs: pick('openPdfs', (v) => typeof v === 'boolean')
   }
   if (typeof input.skippedVersion === 'string') result.skippedVersion = input.skippedVersion
   if (typeof input.checkedAt === 'number') result.checkedAt = input.checkedAt
+  if (typeof input.associatedCommand === 'string')
+    result.associatedCommand = input.associatedCommand
   return result
 }
 
@@ -91,7 +97,7 @@ function persist(): Promise<void> {
 }
 
 export function getSettings(): Settings {
-  const { skippedVersion: _s, checkedAt: _c, ...settings } = load()
+  const { skippedVersion: _s, checkedAt: _c, associatedCommand: _a, ...settings } = load()
   return settings
 }
 
@@ -109,8 +115,8 @@ export function onSettingsChanged(listener: (settings: Settings) => void): () =>
 }
 
 export function updaterMemory(): UpdaterMemory {
-  const { skippedVersion, checkedAt } = load()
-  return { skippedVersion, checkedAt }
+  const { skippedVersion, checkedAt, associatedCommand } = load()
+  return { skippedVersion, checkedAt, associatedCommand }
 }
 
 export function rememberForUpdater(patch: UpdaterMemory): void {

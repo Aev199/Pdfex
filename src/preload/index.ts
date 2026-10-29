@@ -126,6 +126,8 @@ const api = {
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   expandDropPaths: (paths: string[]): Promise<OpenedFile[]> =>
     ipcRenderer.invoke('pdfx:expand-drop-paths', paths),
+  // Windows Settings → Default apps, at PDFx's entry.
+  openDefaultApps: (): Promise<void> => ipcRenderer.invoke('pdfx:default-apps'),
   // A copy of an encrypted PDF without its encryption (for export).
   decryptPdf: (bytes: Uint8Array, password: string): Promise<Uint8Array> =>
     ipcRenderer.invoke('pdfx:decrypt-pdf', bytes, password),

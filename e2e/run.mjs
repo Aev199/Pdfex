@@ -821,6 +821,34 @@ test('files and pictures copied in other programs paste as documents', async () 
   }
 })
 
+test('Windows: "Open PDFs in PDFx" registers for the user and cleans up', async () => {
+  if (process.platform !== 'win32') return
+  const command = 'HKCU\\Software\\Classes\\PDFx.Document\\shell\\open\\command'
+  const query = (key) => {
+    try {
+      return execFileSync('reg.exe', ['query', key, '/ve'], { encoding: 'utf8' })
+    } catch {
+      return null
+    }
+  }
+  const { app, page } = await launch(freshData(), [files.second])
+  try {
+    await rendered(page)
+    await menu(app, 'settings')
+    const box = page.locator('.settings-choice', { hasText: 'Open PDFs in PDFx' }).locator('input')
+    await box.check()
+    for (let i = 0; i < 40 && !query(command); i++) await page.waitForTimeout(250)
+    assert.match(query(command) ?? '', /electron\.exe" ".*" "%1"/i)
+    assert.ok(query('HKCU\\Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\PDFx'))
+    await box.uncheck()
+    for (let i = 0; i < 40 && query(command); i++) await page.waitForTimeout(250)
+    assert.equal(query(command), null)
+    assert.equal(query('HKCU\\Software\\PDFx'), null)
+  } finally {
+    await app.close()
+  }
+})
+
 test('an Office document converts to PDF, or says what to install', async () => {
   const { app, page } = await launch(freshData(), [files.word])
   try {
