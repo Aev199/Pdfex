@@ -849,6 +849,62 @@ test('Windows: "Open PDFs in PDFx" registers for the user and cleans up', async 
   }
 })
 
+test('reader layouts: scroll by width, two pages, back to one at a time for editing', async () => {
+  const { app, page } = await launch(freshData(), [files.report])
+  const counter = () => page.locator('.full-count-input').inputValue()
+  try {
+    await rendered(page)
+    await page.locator('.canvas-world .page[data-page-id]').nth(2).dblclick()
+    await page.waitForTimeout(1000)
+    await page.locator('.reader-layouts button[aria-label^="Scroll"]').click()
+    await page.locator('.full-scroll.continuous').waitFor()
+    assert.equal(await counter(), '3')
+    // The wheel scrolls through the pages; the counter follows.
+    await page.mouse.move(600, 500)
+    for (let i = 0; i < 12; i++) {
+      await page.mouse.wheel(0, 500)
+      await page.waitForTimeout(60)
+    }
+    await page.waitForTimeout(500)
+    assert.ok(Number(await counter()) > 4, `counter ${await counter()}`)
+    // Typed page number jumps there.
+    await page.locator('.full-count-input').fill('9')
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(800)
+    assert.equal(await counter(), '9')
+
+    await page.locator('.reader-layouts button[aria-label^="Two"]').click()
+    await page.waitForTimeout(600)
+    const boxes = await page
+      .locator('.full-page.cont')
+      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top))
+    // Pages side by side share their row.
+    assert.ok(
+      boxes.some((top, i) => boxes.some((other, j) => i !== j && Math.abs(top - other) < 1))
+    )
+
+    // Editing shows the page alone, and the layout comes back after.
+    await page.locator('.full-actions .btn', { hasText: 'Edit' }).click()
+    await page.waitForTimeout(500)
+    assert.equal(await page.locator('.full-scroll.continuous').count(), 0)
+    assert.equal(await page.locator('.reader-layouts button:disabled').count(), 3)
+    await page.locator('.full-actions .btn', { hasText: 'Done' }).click()
+    await page.locator('.full-scroll.continuous').waitFor()
+
+    // Remembered for the next time the reader opens.
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1200)
+    assert.equal(
+      await page.locator('.reader-layouts button.on').getAttribute('aria-label'),
+      'Two pages side by side'
+    )
+  } finally {
+    await app.close()
+  }
+})
+
 test('an Office document converts to PDF, or says what to install', async () => {
   const { app, page } = await launch(freshData(), [files.word])
   try {

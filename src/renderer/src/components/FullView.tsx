@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DocEntry } from '../types'
 import type { MarkKind, MarkLook, MarkMap, MarkRect } from '../edit/types'
 import { isMarkTool } from '../edit/types'
@@ -34,6 +34,10 @@ import { ToolCursor } from './full-view/edit/ToolCursor'
 import { FullViewChrome } from './full-view/FullViewChrome'
 import { FullViewPages } from './full-view/FullViewPages'
 import { FullViewSidebar } from './full-view/FullViewSidebar'
+import { ContinuousPages } from './full-view/continuous/ContinuousPages'
+import type { ContinuousHandle } from './full-view/continuous/ContinuousPages'
+import type { ReaderLayout } from './full-view/continuous/layout'
+import { stepPage } from './full-view/geometry'
 import { useContextMenu } from '../app/context-menu'
 import type { PageEntry } from '../types'
 
@@ -92,6 +96,15 @@ interface FullViewProps {
 }
 
 const SIDEBAR_KEY = 'pdfx.readerSidebar'
+const LAYOUT_KEY = 'pdfx.readerLayout'
+const readLayout = (): ReaderLayout => {
+  try {
+    const value = localStorage.getItem(LAYOUT_KEY)
+    return value === 'scroll' || value === 'spread' ? value : 'page'
+  } catch {
+    return 'page'
+  }
+}
 const COMMENTS_KEY = 'pdfx.readerComments'
 const readPref = (key: string): boolean => {
   try {
@@ -136,6 +149,25 @@ export function FullView({
 }: FullViewProps): React.JSX.Element {
   const s = useFullViewState(docs, startDocId, startPageId, originRect)
   const edit = useEditMode(marks, onRestoreMarks)
+
+  // Pages one at a time (the default, and always while editing or during
+  // the open and close animations), or one long scroll by width or in pairs.
+  const [readerLayout, setReaderLayoutState] = useState<ReaderLayout>(readLayout)
+  const [scrollZoom, setScrollZoom] = useState(1)
+  const setReaderLayout = useCallback((next: ReaderLayout) => {
+    try {
+      localStorage.setItem(LAYOUT_KEY, next)
+    } catch {
+      // Not remembered, still switched.
+    }
+    setReaderLayoutState(next)
+    // A new layout starts fitted.
+    setScrollZoom(1)
+  }, [])
+  const layout: ReaderLayout = edit.editing || s.phase !== 'open' ? 'page' : readerLayout
+  const continuousRef = useRef(false)
+  continuousRef.current = layout !== 'page'
+  const contRef = useRef<ContinuousHandle | null>(null)
   const selection = useElementSelection(edit.editing && isMarkTool(edit.tool), onRemoveElement)
 
   useEffect(() => {
@@ -176,6 +208,7 @@ export function FullView({
     originRect,
     vw: s.vw,
     vh: s.vh,
+    layout,
     setPhase: s.setPhase,
     setFlip: s.setFlip,
     setFlipTransition: s.setFlipTransition,
@@ -194,6 +227,7 @@ export function FullView({
     view: s.view,
     curDi: s.current.di,
     curPi: s.current.pi,
+    layout,
     setViewport: s.setViewport,
     setView: s.setView,
     setCurrent: s.setCurrent,
@@ -205,6 +239,7 @@ export function FullView({
     viewRef: s.viewRef,
     phaseRef: s.phaseRef,
     editingRef: edit.editingRef,
+    continuousRef,
     finishEdit: edit.finishEdit,
     ...controls
   })
@@ -293,7 +328,45 @@ export function FullView({
   }, [])
   const { goTo } = controls
   const { di, doc, pi, page } = s
-  const goToPage = useCallback((index: number) => goTo(di, index), [goTo, di])
+  const goToPage = useCallback(
+    (index: number) => {
+      if (continuousRef.current) contRef.current?.goTo(di, index)
+      else goTo(di, index)
+    },
+    [goTo, di]
+  )
+  // The side buttons and arrows: in the scrolling layouts, to the next page.
+  const { navByKey: turnPage } = controls
+  const navByKey = useCallback(
+    (axis: 'x' | 'y', dir: 1 | -1) => {
+      if (!continuousRef.current) return turnPage(axis, dir)
+      const { di: cdi, pi: cpi } = s.curRef.current
+      const next = stepPage(
+        s.docsRef.current.map((d) => d.pages.length),
+        cdi,
+        cpi,
+        dir
+      )
+      contRef.current?.goTo(next.di, next.pi)
+    },
+    [turnPage, s.curRef, s.docsRef]
+  )
+  const { setCurrent } = s
+  const onContinuousPage = useCallback(
+    (cdi: number, cpi: number) =>
+      setCurrent((c) => (c.di === cdi && c.pi === cpi ? c : { di: cdi, pi: cpi })),
+    [setCurrent]
+  )
+  useEffect(
+    () =>
+      window.api.onZoom((action) => {
+        if (!continuousRef.current) return
+        if (action === 'in') contRef.current?.zoomBy(1.25)
+        else if (action === 'out') contRef.current?.zoomBy(0.8)
+        else setScrollZoom(1)
+      }),
+    []
+  )
 
   // Review comments: the panel on the right and the pins on the pages.
   const [commentsOpen, setCommentsOpenState] = useState(() => readPref(COMMENTS_KEY))
@@ -442,59 +515,79 @@ export function FullView({
   const chromeOpacity = s.revealed ? 1 : 0
 
   return (
-    <div className="full-view">
+    <div className={`full-view${layout === 'page' ? '' : ' scrolling'}`}>
       <div className="full-backdrop" style={{ opacity: chromeOpacity }} />
-      <FullViewPages
-        scrollRef={s.scrollRef}
-        drag={s.drag}
-        draggedRef={s.draggedRef}
-        docs={docs}
-        viewport={s.viewport}
-        di={s.di}
-        pi={s.pi}
-        view={s.view}
-        fit={s.fit}
-        vw={s.vw}
-        vh={s.vh}
-        zoomed={s.zoomed}
-        interactive={s.interactive}
-        animating={animating}
-        flip={s.flip}
-        flipTransition={s.flipTransition}
-        renderVersion={s.renderVersion}
-        marks={marks}
-        hasSelection={selection.selected !== null}
-        selectTool={edit.editing ? edit.tool : null}
-        onMark={(pageId, rects) => {
-          if (isMarkTool(edit.tool)) {
-            onToggleMark(
-              pageId,
-              edit.tool,
-              rects,
-              edit.tool === 'highlight' ? edit.markLook : undefined
-            )
-          }
-        }}
-        formValues={formValues}
-        onFieldChange={onFieldChange}
-        elements={elements}
-        selectedElementId={selection.selected?.elementId ?? null}
-        onSelectElement={selection.selectElement}
-        onMoveElement={onMoveElement}
-        onDraw={onAddInk}
-        annotate={annotate}
-        commentLayer={commentLayer}
-        onSourcePage={followLink}
-        onAddText={onAddText}
-        onMarkText={(pageId, elementId, span) => {
-          if (isMarkTool(edit.tool)) onToggleTextMark(pageId, elementId, edit.tool, span)
-        }}
-        onUpdateText={onUpdateText}
-        setView={s.setView}
-        resetView={controls.resetView}
-        applyZoom={controls.applyZoom}
-        runClose={controls.runClose}
-      />
+      {layout === 'page' ? (
+        <FullViewPages
+          scrollRef={s.scrollRef}
+          drag={s.drag}
+          draggedRef={s.draggedRef}
+          docs={docs}
+          viewport={s.viewport}
+          di={s.di}
+          pi={s.pi}
+          view={s.view}
+          fit={s.fit}
+          vw={s.vw}
+          vh={s.vh}
+          zoomed={s.zoomed}
+          interactive={s.interactive}
+          animating={animating}
+          flip={s.flip}
+          flipTransition={s.flipTransition}
+          renderVersion={s.renderVersion}
+          marks={marks}
+          hasSelection={selection.selected !== null}
+          selectTool={edit.editing ? edit.tool : null}
+          onMark={(pageId, rects) => {
+            if (isMarkTool(edit.tool)) {
+              onToggleMark(
+                pageId,
+                edit.tool,
+                rects,
+                edit.tool === 'highlight' ? edit.markLook : undefined
+              )
+            }
+          }}
+          formValues={formValues}
+          onFieldChange={onFieldChange}
+          elements={elements}
+          selectedElementId={selection.selected?.elementId ?? null}
+          onSelectElement={selection.selectElement}
+          onMoveElement={onMoveElement}
+          onDraw={onAddInk}
+          annotate={annotate}
+          commentLayer={commentLayer}
+          onSourcePage={followLink}
+          onAddText={onAddText}
+          onMarkText={(pageId, elementId, span) => {
+            if (isMarkTool(edit.tool)) onToggleTextMark(pageId, elementId, edit.tool, span)
+          }}
+          onUpdateText={onUpdateText}
+          setView={s.setView}
+          resetView={controls.resetView}
+          applyZoom={controls.applyZoom}
+          runClose={controls.runClose}
+        />
+      ) : (
+        <ContinuousPages
+          docs={docs}
+          columns={layout === 'spread' ? 2 : 1}
+          zoom={scrollZoom}
+          onZoom={setScrollZoom}
+          vw={s.vw}
+          vh={s.vh}
+          current={{ di: s.di, pi: s.pi }}
+          onCurrent={onContinuousPage}
+          handleRef={contRef}
+          marks={marks}
+          elements={elements}
+          formValues={formValues}
+          onFieldChange={onFieldChange}
+          commentLayer={commentLayer}
+          onSourcePage={followLink}
+        />
+      )}
       {edit.editing && <div className="edit-glow" />}
       <FullViewChrome
         chromeOpacity={chromeOpacity}
@@ -524,7 +617,10 @@ export function FullView({
           />
         }
         runClose={controls.runClose}
-        navByKey={controls.navByKey}
+        navByKey={navByKey}
+        layout={readerLayout}
+        layoutLocked={edit.editing}
+        onLayout={setReaderLayout}
         goToPage={goToPage}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={toggleSidebar}

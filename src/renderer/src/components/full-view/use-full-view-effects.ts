@@ -16,6 +16,8 @@ interface EffectsOptions {
   view: View
   curDi: number
   curPi: number
+  // The page scroller is remounted when coming back from a scrolling layout.
+  layout: string
   setViewport: (vp: { w: number; h: number }) => void
   setView: React.Dispatch<React.SetStateAction<View>>
   setCurrent: React.Dispatch<React.SetStateAction<{ di: number; pi: number }>>
@@ -24,7 +26,7 @@ interface EffectsOptions {
 
 export function useFullViewEffects(opts: EffectsOptions): void {
   const { scrollRef, scrollRaf, docsRef, vpRef, pageId, onActivePageChange } = opts
-  const { vw, vh, fit, view, curDi, curPi } = opts
+  const { vw, vh, fit, view, curDi, curPi, layout } = opts
   const { setViewport, setView, setCurrent, setRenderVersion } = opts
 
   useEffect(() => {
@@ -51,7 +53,7 @@ export function useFullViewEffects(opts: EffectsOptions): void {
     }
     sc.addEventListener('scroll', onScroll, { capture: true, passive: true })
     return () => sc.removeEventListener('scroll', onScroll, { capture: true })
-  }, [])
+  }, [layout])
 
   useEffect(() => {
     setView((v) => {

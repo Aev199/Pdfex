@@ -1843,3 +1843,64 @@
   color: #ff6b61;
   font-size: 12.5px;
 }
+
+/* ── Reader layouts ────────────────────────────────────────────── */
+
+.reader-layouts {
+  pointer-events: auto;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--scrim);
+}
+
+.reader-layouts button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.reader-layouts button.on {
+  background: var(--control);
+  color: var(--ink);
+}
+
+.reader-layouts button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.full-scroll.continuous {
+  overflow: auto;
+  scroll-snap-type: none;
+  scrollbar-width: thin;
+}
+
+.cont-world {
+  position: relative;
+}
+
+.full-page.cont {
+  position: absolute;
+}
+
+.cont-label {
+  position: absolute;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Pages scroll under the toolbar: a shade keeps its buttons readable. */
+.full-view.scrolling .full-bar {
+  background: linear-gradient(rgba(19, 19, 22, 0.92), rgba(19, 19, 22, 0.6) 70%, transparent);
+}
