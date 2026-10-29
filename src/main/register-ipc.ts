@@ -5,6 +5,7 @@ import { writeFile } from 'fs/promises'
 import { markupToPdf } from './markup'
 import { OpenedFile, IMPORTABLE, readFiles, expandDropPaths } from './file-intake'
 import { clipboardFilePaths, clipboardImage, safePaste } from './clipboard'
+import { decryptPdf } from './pdf-decrypt'
 import { readResource } from './resource'
 import { fileInfo, readSource, statSource } from './source-files'
 import { listExternalApps, openExternal, resolveFile } from './open-with'
@@ -98,6 +99,9 @@ export function registerIpc(getPending: () => string[], clearPending: () => void
 
   ipcMain.handle('pdfx:clipboard-clear', () => clipboard.clear())
   ipcMain.handle('pdfx:paste-text', (event) => safePaste(event.sender))
+  ipcMain.handle('pdfx:decrypt-pdf', (_event, bytes: Uint8Array, password: string) =>
+    decryptPdf(bytes, typeof password === 'string' ? password : '')
+  )
 
   ipcMain.handle(
     'pdfx:expand-drop-paths',

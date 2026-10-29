@@ -126,6 +126,9 @@ const api = {
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   expandDropPaths: (paths: string[]): Promise<OpenedFile[]> =>
     ipcRenderer.invoke('pdfx:expand-drop-paths', paths),
+  // A copy of an encrypted PDF without its encryption (for export).
+  decryptPdf: (bytes: Uint8Array, password: string): Promise<Uint8Array> =>
+    ipcRenderer.invoke('pdfx:decrypt-pdf', bytes, password),
   // Re-read a file the user opened earlier (null if moved, deleted or never opened).
   readSource: (path: string): Promise<(FileStamp & { data: Uint8Array }) | null> =>
     ipcRenderer.invoke('pdfx:read-source', path),

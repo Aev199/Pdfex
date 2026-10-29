@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { findConverter } from '../pdfx/convert'
 import { fileMeta, importIntoDocs, loadIncomingPages } from '../pdfx/source'
 import { dedupeNames } from './names'
+import { PasswordCancelled } from './password-prompt'
 import { ConvertError } from '../pdfx/office'
 import { applyExternalDrop } from './external-drop'
 import type { Collection } from './useCollection'
@@ -53,7 +54,7 @@ export function useImport(
         } catch (error) {
           console.error(`Failed to import ${file.name}`, error)
           if (error instanceof ConvertError) reasons.push(error.message)
-          else failed.push(file.name)
+          else if (!(error instanceof PasswordCancelled)) failed.push(file.name)
         } finally {
           setPending((prev) => prev.filter((p) => p.id !== row.id))
         }

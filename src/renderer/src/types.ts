@@ -17,6 +17,9 @@ export interface PdfSource {
   // True when the bytes are exactly the file at `path` (a PDF opened as is),
   // false when they were produced from it (image, text, HTML converted to PDF).
   pristine?: boolean
+  // Set when the PDF is encrypted: the password it was opened with ('' when
+  // it opens without one). Kept in memory only, for export (see sourceBytes).
+  password?: string
 }
 
 export interface PageEntry {

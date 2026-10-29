@@ -614,6 +614,40 @@ test('two revisions of a sheet are compared: removed red, added blue', async () 
   }
 })
 
+test('protected PDFs ask for their password and export as plain PDFs', async () => {
+  const fixtures = join(import.meta.dirname, '..', 'src', 'main', 'test-pdfs')
+  const locked = join(work, 'Акт (пароль).pdf')
+  const restricted = join(work, 'Только чтение.pdf')
+  writeFileSync(locked, readFileSync(join(fixtures, 'aes-256-user.pdf')))
+  writeFileSync(restricted, readFileSync(join(fixtures, 'rc4-128.pdf')))
+  const out = join(work, 'unlocked.pdf')
+  const { app, page } = await launch(freshData(), [restricted, locked])
+  try {
+    const field = page.locator('.password-dialog input[type=password]')
+    await field.waitFor()
+    assert.match(await page.locator('.password-dialog').textContent(), /Акт \(пароль\)\.pdf/)
+    await field.fill('wrong')
+    await page.keyboard.press('Enter')
+    await page.locator('.password-error').waitFor()
+    await field.fill('1234')
+    await page.keyboard.press('Enter')
+    await page.waitForFunction(() => document.querySelectorAll('.doc-name').length === 2)
+    await mockSaveDialog(app, out)
+    await menu(app, 'export-pdf')
+    for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
+  } finally {
+    await app.close()
+  }
+  // Both documents' pages, readable without any password.
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(out)) }).promise
+  assert.equal(doc.numPages, 2)
+  for (const n of [1, 2]) {
+    const content = await (await doc.getPage(n)).getTextContent()
+    assert.match(content.items.map((i) => i.str).join(''), /Secret drawing 42/)
+  }
+})
+
 test('reader: thumbnails, page jump, rotation and printing', async () => {
   const { app, page } = await launch(freshData(), [files.report])
   try {

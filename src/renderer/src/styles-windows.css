@@ -1823,3 +1823,23 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* ── Password prompt ───────────────────────────────────────────── */
+
+.password-dialog .password-input {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 7px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  background: var(--group-bg);
+  color: var(--ink);
+  font: inherit;
+}
+
+.password-dialog .password-error {
+  margin: 4px 0 0;
+  color: #ff6b61;
+  font-size: 12.5px;
+}

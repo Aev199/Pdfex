@@ -49,6 +49,9 @@ export function createWebApi(): PdfxApi {
     getPathForFile: () => '',
     expandDropPaths: async () => [],
     readSource: async () => null,
+    decryptPdf: async () => {
+      throw new Error('Encrypted PDFs are exported by the desktop app only')
+    },
     officeConverter: async () => null,
     officeConvert: async () => {
       throw new Error('Office conversion needs the desktop app')
