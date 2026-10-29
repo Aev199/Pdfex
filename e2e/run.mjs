@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { execFileSync } from 'node:child_process'
-import { PDFDocument, PDFName, rgb } from 'pdf-lib'
+import { PDFArray, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream, rgb } from 'pdf-lib'
 import { inflateSync } from 'node:zlib'
 import { createHash } from 'node:crypto'
 import { strToU8, zipSync } from 'fflate'
@@ -638,13 +638,20 @@ test('protected PDFs ask for their password and export as plain PDFs', async () 
   } finally {
     await app.close()
   }
-  // Both documents' pages, readable without any password.
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(out)) }).promise
-  assert.equal(doc.numPages, 2)
-  for (const n of [1, 2]) {
-    const content = await (await doc.getPage(n)).getTextContent()
-    assert.match(content.items.map((i) => i.str).join(''), /Secret drawing 42/)
+  // Both documents' pages, readable without any password: the text (in a
+  // standard font, so as glyph codes) is in each page's instructions.
+  const doc = await PDFDocument.load(readFileSync(out))
+  assert.equal(doc.getPageCount(), 2)
+  const hex = Buffer.from('Secret drawing 42', 'latin1').toString('hex').toUpperCase()
+  for (const page of doc.getPages()) {
+    const contents = page.node.Contents()
+    const refs = contents instanceof PDFArray ? contents.asArray() : [contents]
+    const text = refs
+      .map((r) => doc.context.lookup(r))
+      .filter((st) => st instanceof PDFRawStream)
+      .map((st) => Buffer.from(decodePDFRawStream(st).decode()).toString('latin1'))
+      .join('\n')
+    assert.ok(text.includes('(Secret drawing 42)') || text.toUpperCase().includes(`<${hex}>`))
   }
 })
 

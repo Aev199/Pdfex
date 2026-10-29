@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { PDFDocument } from 'pdf-lib'
+import { PDFArray, PDFDocument, PDFRawStream, decodePDFRawStream } from 'pdf-lib'
 import { decryptPdf, isEncryptedPdf, PdfPasswordError } from './pdf-decrypt'
 
 // Made with pypdf (and pdf.js for the object-stream one) from a one-page PDF
@@ -9,12 +9,21 @@ import { decryptPdf, isEncryptedPdf, PdfPasswordError } from './pdf-decrypt'
 const fixture = (name: string): Uint8Array =>
   new Uint8Array(readFileSync(join(__dirname, 'test-pdfs', `${name}.pdf`)))
 
-async function pageText(bytes: Uint8Array): Promise<string> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const doc = await pdfjs.getDocument({ data: bytes.slice(), verbosity: 0 }).promise
-  const content = await (await doc.getPage(1)).getTextContent()
-  return content.items.map((item) => ('str' in item ? item.str : '')).join('')
+// The first page's drawing instructions, decompressed: the text is written
+// with a standard font, so it shows as hex glyph codes or a literal string.
+function pageContent(doc: PDFDocument): string {
+  const contents = doc.getPage(0).node.Contents()
+  const streams = contents instanceof PDFArray ? contents.asArray() : [contents]
+  return streams
+    .map((ref) => doc.context.lookup(ref))
+    .filter((s): s is PDFRawStream => s instanceof PDFRawStream)
+    .map((s) => Buffer.from(decodePDFRawStream(s).decode()).toString('latin1'))
+    .join('\n')
 }
+
+const hasText = (content: string, text: string): boolean =>
+  content.includes(`(${text})`) ||
+  content.toUpperCase().includes(`<${Buffer.from(text, 'latin1').toString('hex').toUpperCase()}>`)
 
 describe('PDF decryption', () => {
   it.each([
@@ -36,7 +45,7 @@ describe('PDF decryption', () => {
     const doc = await PDFDocument.load(plain)
     expect(doc.getPageCount()).toBe(1)
     expect(doc.getTitle()).toBe('Plain title')
-    expect(await pageText(plain)).toContain('Secret drawing 42')
+    expect(hasText(pageContent(doc), 'Secret drawing 42')).toBe(true)
   })
 
   it('refuses a wrong password and leaves plain files alone', async () => {
