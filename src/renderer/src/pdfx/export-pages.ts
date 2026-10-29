@@ -1,5 +1,6 @@
 import { toExportPage } from './source'
 import { hiddenLayerNames } from './layers'
+import { commentAuthor, getSettings } from '../app/settings-store'
 import { rasterizeMarkedPage } from './rasterize'
 import { buildRedactedSourcePage } from './redact'
 import type { Mark } from '../edit/types'
@@ -23,6 +24,7 @@ export async function prepareExportPage(
     prepared.ocrWords = ocrWords
   }
   prepared.elements = elements
+  if (getSettings().exportAnnotations === 'editable') prepared.editableBy = commentAuthor()
   if (prepared.kind === 'source') prepared.hiddenLayers = await hiddenLayerNames(page.source.pdf)
   prepared.comments = comments
   prepared.rotation = page.rotation

@@ -293,6 +293,62 @@ function pageContent(doc, index) {
     .join('\n')
 }
 
+test('marks and drawings can be exported as annotations other programs can edit', async () => {
+  const { app, page } = await launch(freshData(), [files.second])
+  const out = join(work, 'editable.pdf')
+  try {
+    await rendered(page)
+    await menu(app, 'settings')
+    await page.locator('.settings-choice', { hasText: 'others can move or delete' }).click()
+    await page.keyboard.press('Escape')
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    await page.locator('.full-actions .btn', { hasText: 'Edit' }).click()
+    const fp = await page.locator('.full-page').first().boundingBox()
+    const at = (fx, fy) => [fp.x + fp.width * fx, fp.y + fp.height * fy]
+    const drag = async (a, b) => {
+      await page.mouse.move(...a)
+      await page.mouse.down()
+      await page.mouse.move(...b, { steps: 6 })
+      await page.mouse.up()
+    }
+    await page.locator('.annotate-swatch').nth(1).click() // red
+    await page.locator('.annotate-tool[title="Rectangle"]').click()
+    await drag(at(0.2, 0.4), at(0.6, 0.6))
+    await page.locator('.annotate-tool[title="Pen"]').click()
+    await drag(at(0.2, 0.8), at(0.6, 0.85))
+    await page.locator('.full-actions .btn', { hasText: 'Highlight' }).click()
+    const line = page.locator('.edit-select-layer span').nth(6)
+    const box = await line.boundingBox()
+    await drag([box.x + 2, box.y + box.height / 2], [box.x + box.width - 2, box.y + box.height / 2])
+    await page.locator('.full-actions .btn', { hasText: 'Done' }).click()
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await mockSaveDialog(app, out)
+    await menu(app, 'export-pdf')
+    for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
+  } finally {
+    await app.close()
+  }
+  const doc = await PDFDocument.load(readFileSync(out))
+  const annots = doc.getPage(0).node.Annots()
+  const kinds = annots
+    .asArray()
+    .map((ref) => doc.context.lookup(ref))
+    .map((a) => ({
+      subtype: a.get(PDFName.of('Subtype'))?.toString(),
+      ap: !!a.get(PDFName.of('AP'))
+    }))
+  for (const subtype of ['/Square', '/Ink', '/Highlight']) {
+    assert.ok(
+      kinds.some((k) => k.subtype === subtype && k.ap),
+      `${subtype} in ${JSON.stringify(kinds)}`
+    )
+  }
+  // Not drawn into the page itself.
+  assert.doesNotMatch(pageContent(doc, 0), /0\.898\d* 0\.196\d* 0\.176\d* RG/)
+})
+
 test('styled text and an underline are exported with their fonts and colours', async () => {
   const { app, page } = await launch(freshData(), [files.second])
   const out = join(work, 'styled.pdf')
@@ -997,6 +1053,51 @@ test('drawing layers can be hidden, and stay in the export switched off', async 
   const config = await doc.getOptionalContentConfig()
   const state = Object.fromEntries([...config].map(([, g]) => [g.name, g.visible]))
   assert.deepEqual(state, { Арматура: true, Размеры: false })
+})
+
+test("other people's comments in a PDF join the panel and are answered in place", async () => {
+  const { app, page } = await launch(freshData(), [files.reviewed])
+  const out = join(work, 'answered.pdf')
+  try {
+    await rendered(page)
+    // One open thread (the highlight's was closed in the other program).
+    await page.waitForFunction(() => document.querySelector('.page-comments')?.textContent === '1')
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1000)
+    if (!(await page.locator('.comments-panel').count())) await page.keyboard.press('F6')
+    const card = page.locator('.comment-card').first()
+    assert.equal(await page.locator('.comment-card').count(), 1)
+    assert.match(await card.textContent(), /Иванов.*Проверьте размер.*Петров.*Исправлено/s)
+    assert.match(await card.textContent(), /in the file/)
+    await card.click()
+    // Someone else's words can't be edited or deleted here.
+    assert.equal(await card.locator('.comment-tools:visible').count(), 0)
+    await card.locator('.comment-reply-btn').click()
+    await page.keyboard.type('Согласен')
+    await page.keyboard.press('Enter')
+    await page.locator('.comments-filter input').check()
+    assert.match(
+      await page.locator('.comment-card.resolved').textContent(),
+      /Уточнить марку бетона/
+    )
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await mockSaveDialog(app, out)
+    await menu(app, 'export-pdf')
+    for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
+  } finally {
+    await app.close()
+  }
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(out)) }).promise
+  const notes = await (await doc.getPage(1)).getAnnotations()
+  const byText = (t) => notes.filter((n) => n.contentsObj?.str === t)
+  // The file's own comments once each, the new reply under the note.
+  assert.equal(byText('Проверьте размер').length, 1)
+  assert.equal(byText('Исправлено').length, 1)
+  assert.equal(byText('Уточнить марку бетона').length, 1)
+  const root = byText('Проверьте размер')[0]
+  assert.equal(byText('Согласен')[0]?.inReplyTo, root.id)
 })
 
 test('an Office document converts to PDF, or says what to install', async () => {

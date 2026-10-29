@@ -23,6 +23,9 @@ export interface Settings {
   exportOcr: boolean
   // Windows: PDFx is offered for PDFs (Open with, Explorer menu).
   openPdfs: boolean
+  // Exported marks and drawings: part of the page, or annotations other
+  // programs can move and delete.
+  exportAnnotations: 'page' | 'editable'
 }
 
 export interface AppInfo {

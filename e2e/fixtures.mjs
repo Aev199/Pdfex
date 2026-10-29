@@ -1,6 +1,6 @@
 // Test documents, generated so the suite needs no binary fixtures: a
 // Cyrillic text report, a large-format drawing and a short second report.
-import { PDFDocument, PDFHexString, PDFName, PDFNumber, PDFOperator, rgb } from 'pdf-lib'
+import { PDFDocument, PDFHexString, PDFName, PDFNumber, PDFOperator, PDFString, rgb } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -91,6 +91,57 @@ export async function layeredDrawing() {
   return doc.save()
 }
 
+// A report reviewed in another program: a sticky note with a reply, and a
+// highlight whose comment was marked Completed.
+export async function reviewedReport() {
+  const doc = await PDFDocument.load(await report(1, 'Отчёт с замечаниями'))
+  const page = doc.getPage(0)
+  const ctx = doc.context
+  const text = (s) => PDFHexString.fromText(s)
+  const annot = (fields) =>
+    ctx.register(
+      ctx.obj({
+        Type: 'Annot',
+        CreationDate: PDFString.of('D:20261020110000Z'),
+        M: PDFString.of('D:20261020110000Z'),
+        ...fields
+      })
+    )
+  const note = annot({
+    Subtype: 'Text',
+    Rect: [100, 700, 120, 720],
+    Contents: text('Проверьте размер'),
+    T: text('Иванов')
+  })
+  const reply = annot({
+    Subtype: 'Text',
+    Rect: [100, 700, 120, 720],
+    IRT: note,
+    Contents: text('Исправлено'),
+    T: text('Петров')
+  })
+  const highlight = annot({
+    Subtype: 'Highlight',
+    Rect: [50, 500, 300, 520],
+    QuadPoints: [50, 520, 300, 520, 50, 500, 300, 500],
+    C: [1, 1, 0],
+    Contents: text('Уточнить марку бетона'),
+    T: text('Сидоров')
+  })
+  const done = annot({
+    Subtype: 'Text',
+    Rect: [50, 500, 70, 520],
+    IRT: highlight,
+    F: 30,
+    State: PDFString.of('Completed'),
+    StateModel: PDFString.of('Review'),
+    Contents: text('Completed set by Сидоров'),
+    T: text('Сидоров')
+  })
+  page.node.set(PDFName.of('Annots'), ctx.obj([note, reply, highlight, done]))
+  return doc.save()
+}
+
 // The smallest Word document Word and LibreOffice will open.
 function docx(paragraphs) {
   const body = paragraphs
@@ -115,8 +166,10 @@ export async function makeFixtures(dir) {
     drawing: join(dir, 'КЖ лист 1.pdf'),
     second: join(dir, 'Расчёт MIDAS.pdf'),
     word: join(dir, 'Пояснительная записка.docx'),
-    layered: join(dir, 'КЖ слои.pdf')
+    layered: join(dir, 'КЖ слои.pdf'),
+    reviewed: join(dir, 'Отчёт с замечаниями.pdf')
   }
+  writeFileSync(files.reviewed, await reviewedReport())
   writeFileSync(files.layered, await layeredDrawing())
   writeFileSync(
     files.word,

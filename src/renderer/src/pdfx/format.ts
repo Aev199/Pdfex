@@ -37,6 +37,8 @@ export interface SourceExportPage {
   ocrWords?: OcrWord[]
   // Names of the source's layers switched off in PDFx.
   hiddenLayers?: string[]
+  // Marks and elements as annotations, signed with this name.
+  editableBy?: string
   // Extra clockwise turn chosen in PDFx (0, 90, 180, 270).
   rotation?: number
 }
@@ -48,6 +50,7 @@ export interface RasterExportPage {
   height: number
   elements?: PageElement[]
   comments?: CommentThread[]
+  editableBy?: string
   rotation?: number
 }
 

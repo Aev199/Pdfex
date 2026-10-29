@@ -127,6 +127,31 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
       </section>
 
       <section className="settings-section">
+        <h3>Export</h3>
+        <label className="settings-choice">
+          <input
+            type="radio"
+            name="exportAnnotations"
+            checked={settings.exportAnnotations === 'page'}
+            onChange={() => void changeSettings({ exportAnnotations: 'page' })}
+          />
+          <span>Marks and drawings become part of the page</span>
+        </label>
+        <label className="settings-choice">
+          <input
+            type="radio"
+            name="exportAnnotations"
+            checked={settings.exportAnnotations === 'editable'}
+            onChange={() => void changeSettings({ exportAnnotations: 'editable' })}
+          />
+          <span>As annotations others can move or delete (Acrobat, Foxit)</span>
+        </label>
+        <p className="settings-hint">
+          Hidden text is always burned into the page. Comments are always exported as notes.
+        </p>
+      </section>
+
+      <section className="settings-section">
         <h3>Word, Excel and PowerPoint</h3>
         <label className="settings-row">
           <span>Convert with</span>

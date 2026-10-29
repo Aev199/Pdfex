@@ -16,6 +16,8 @@ const ICON_FLAGS = 8 | 16
 const STATE_FLAGS = 2 | ICON_FLAGS
 const NOTE_COLOR = [0.98, 0.78, 0.2]
 
+const commentAuthorOf = (thread: CommentThread): string => thread.resolvedBy || thread.author
+
 const pdfDate = (iso: string | undefined): PDFString | undefined => {
   const date = iso ? new Date(iso) : null
   return date && !Number.isNaN(date.getTime()) ? PDFString.fromDate(date) : undefined
@@ -49,10 +51,21 @@ function note(
   return doc.context.obj(fields)
 }
 
+// pdf.js names an annotation by its object reference: "15R" ("15R2" for a
+// later generation).
+export const annotationId = (ref: PDFRef): string =>
+  ref.generationNumber === 0
+    ? `${ref.objectNumber}R`
+    : `${ref.objectNumber}R${ref.generationNumber}`
+
+// `copied`: the page's own annotations as copied into `doc`, by their id in
+// the source file. Comments read from the file are already among them; only
+// what was added here (replies, a change of state) is written next to them.
 export function addCommentAnnotations(
   doc: PDFDocument,
   page: PDFPage,
-  threads: CommentThread[] | undefined
+  threads: CommentThread[] | undefined,
+  copied: Map<string, PDFRef> = new Map()
 ): void {
   if (!threads?.length) return
   const box = page.getCropBox()
@@ -71,8 +84,37 @@ export function addCommentAnnotations(
     const at = visualPointToUser(thread.anchor.x, thread.anchor.y, box, rot)
     // The icon hangs from its top-left corner at the pin.
     const rect = [at.x, at.y - ICON, at.x + ICON, at.y]
-    const root = add(note(doc, page, rect, thread, {}))
-    for (const reply of thread.replies) add(note(doc, page, rect, reply, { IRT: root }))
+    const inFile = thread.origin ? copied.get(thread.origin) : undefined
+    const root = inFile ?? add(note(doc, page, rect, thread, {}))
+    for (const reply of thread.replies) {
+      if (inFile && reply.origin) continue
+      add(note(doc, page, rect, reply, { IRT: root }))
+    }
+    if (inFile && thread.resolved === !!thread.resolvedInFile) continue
+    if (inFile && !thread.resolved) {
+      // Reopened here: the review state goes back to none.
+      const by = commentAuthorOf(thread)
+      add(
+        note(
+          doc,
+          page,
+          rect,
+          {
+            id: `${thread.id}-state`,
+            author: by,
+            text: `None set by ${by}`,
+            createdAt: new Date().toISOString()
+          },
+          {
+            IRT: root,
+            State: PDFString.of('None'),
+            StateModel: PDFString.of('Review'),
+            F: STATE_FLAGS
+          }
+        )
+      )
+      continue
+    }
     if (thread.resolved) {
       const by = thread.resolvedBy || thread.author
       add(

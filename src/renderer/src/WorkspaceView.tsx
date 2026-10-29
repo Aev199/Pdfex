@@ -12,6 +12,7 @@ import { useMarks } from './app/useMarks'
 import { useComments } from './app/useComments'
 import { rotateKey } from './app/rotate-keys'
 import { lastPosition, rememberPosition } from './app/reading-positions'
+import { readPdfComments } from './comments/import'
 import { CompareView } from './components/compare/CompareView'
 import type { ComparePage } from './components/compare/CompareView'
 import { useFormValues } from './app/useFormValues'
@@ -156,6 +157,25 @@ export function WorkspaceView({
     }
   }, [readingPage, collection.docsRef])
   const seenDocs = useRef(new Set(initial.docs.map((d) => d.id)))
+  // Comments in a newly opened file join the comment panel (once per file:
+  // copies of its pages don't read them again).
+  const seenSources = useRef(new Set(initial.docs.flatMap((d) => d.pages.map((p) => p.source.id))))
+  const { importThreads } = commentState
+  useEffect(() => {
+    const pages = collection.docs
+      .flatMap((d) => d.pages)
+      .filter((p) => !seenSources.current.has(p.source.id))
+    if (pages.length === 0) return
+    for (const p of pages) seenSources.current.add(p.source.id)
+    void (async () => {
+      const found = new Map<string, Awaited<ReturnType<typeof readPdfComments>>>()
+      for (const page of pages) {
+        const threads = await readPdfComments(page).catch(() => [])
+        if (threads.length > 0) found.set(page.id, threads)
+      }
+      if (found.size > 0) importThreads(found)
+    })()
+  }, [collection.docs, importThreads])
   const [resume, setResume] = useState<{
     docId: string
     pageId: string

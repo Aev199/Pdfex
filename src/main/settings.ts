@@ -17,7 +17,8 @@ export const DEFAULT_SETTINGS: Settings = {
   restoreSession: true,
   commentAuthor: '',
   exportOcr: true,
-  openPdfs: false
+  openPdfs: false,
+  exportAnnotations: 'page'
 }
 
 // The Windows account name signs comments until the user picks a name.
@@ -65,7 +66,8 @@ export function sanitize(raw: unknown): Stored {
         ? input.commentAuthor.trim().slice(0, 60)
         : accountName(),
     exportOcr: pick('exportOcr', (v) => typeof v === 'boolean'),
-    openPdfs: pick('openPdfs', (v) => typeof v === 'boolean')
+    openPdfs: pick('openPdfs', (v) => typeof v === 'boolean'),
+    exportAnnotations: pick('exportAnnotations', oneOf(['page', 'editable']))
   }
   if (typeof input.skippedVersion === 'string') result.skippedVersion = input.skippedVersion
   if (typeof input.checkedAt === 'number') result.checkedAt = input.checkedAt
