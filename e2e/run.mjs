@@ -32,6 +32,7 @@ test('opens PDFs from the command line and renders them', async () => {
   const { app, page, errors } = await launch(freshData(), [files.report, files.drawing])
   try {
     await rendered(page, 3)
+    await page.waitForFunction(() => document.querySelectorAll('.doc-name').length === 2)
     assert.deepEqual(await texts(page, '.doc-name'), ['Технический отчёт ИГИ', 'КЖ лист 1'])
     assert.deepEqual(errors, [])
   } finally {
