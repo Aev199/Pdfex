@@ -1,0 +1,4 @@
+# Binary test files must reach Windows checkouts byte for byte.
+*.pdf binary
+*.png binary
+*.traineddata.gz binary
