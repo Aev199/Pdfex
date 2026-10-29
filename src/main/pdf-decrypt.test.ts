@@ -11,10 +11,7 @@ const fixture = (name: string): Uint8Array =>
 
 async function pageText(bytes: Uint8Array): Promise<string> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const doc = await pdfjs.getDocument({
-    data: bytes.slice(),
-    standardFontDataUrl: join(__dirname, '../../node_modules/pdfjs-dist/standard_fonts/')
-  }).promise
+  const doc = await pdfjs.getDocument({ data: bytes.slice(), verbosity: 0 }).promise
   const content = await (await doc.getPage(1)).getTextContent()
   return content.items.map((item) => ('str' in item ? item.str : '')).join('')
 }
