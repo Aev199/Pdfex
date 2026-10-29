@@ -1,5 +1,6 @@
 import type { PageEntry } from '../types'
 import { track } from '../pdfx/pdf-activity'
+import { layerConfig } from '../pdfx/layers'
 
 // Both revisions are drawn onto sheets of one size: the older page's shape,
 // as large as a pixel budget allows (about 100 dpi on an A1 drawing).
@@ -45,7 +46,8 @@ async function draw(page: PageEntry, w: number, h: number): Promise<HTMLCanvasEl
         canvasContext: ctx,
         viewport,
         transform: ox || oy ? [1, 0, 0, 1, ox, oy] : undefined,
-        background: '#ffffff'
+        background: '#ffffff',
+        optionalContentConfigPromise: layerConfig(page.source.pdf)
       }).promise
   )
   return canvas

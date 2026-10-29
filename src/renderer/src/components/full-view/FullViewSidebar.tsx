@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { PageView } from '../PageView'
 import type { DocEntry, PdfSource } from '../../types'
+import { listLayers, setLayersVisible, useLayerVersion } from '../../pdfx/layers'
+import type { Layer } from '../../pdfx/layers'
 
-// Reader sidebar: page thumbnails of the open document, or the PDF's own
-// outline (bookmarks). Either one jumps to the page.
+// Reader sidebar: page thumbnails of the open document, the PDF's own
+// outline (bookmarks), or its layers when it has any.
 
 export interface OutlineNode {
   title: string
@@ -79,6 +81,40 @@ function OutlineList({
   )
 }
 
+// The layers of the document's file (the first source: a document made of
+// several files shows the first one's).
+function LayerList({ pdf }: { pdf: PdfSource['pdf'] }): React.JSX.Element {
+  const version = useLayerVersion(pdf)
+  const [layers, setLayers] = useState<Layer[]>([])
+  useEffect(() => {
+    let alive = true
+    void listLayers(pdf).then((list) => alive && setLayers(list))
+    return () => {
+      alive = false
+    }
+  }, [pdf, version])
+  const all = layers.map((l) => l.id)
+  return (
+    <div className="fv-layers">
+      <div className="fv-layers-actions">
+        <button onClick={() => void setLayersVisible(pdf, all, true)}>Show all</button>
+        <button onClick={() => void setLayersVisible(pdf, all, false)}>Hide all</button>
+      </div>
+      {layers.map((layer) => (
+        <label key={layer.id} className="fv-layer" title={layer.name}>
+          <input
+            type="checkbox"
+            checked={layer.visible}
+            onChange={(e) => void setLayersVisible(pdf, [layer.id], e.target.checked)}
+          />
+          <span>{layer.name}</span>
+        </label>
+      ))}
+      <p className="fv-layers-hint">Hidden layers stay in exports, switched off.</p>
+    </div>
+  )
+}
+
 interface SidebarProps {
   doc: DocEntry
   current: number
@@ -86,8 +122,21 @@ interface SidebarProps {
 }
 
 export function FullViewSidebar({ doc, current, onGo }: SidebarProps): React.JSX.Element {
-  const [tab, setTab] = useState<'pages' | 'outline'>('pages')
+  const [tab, setTab] = useState<'pages' | 'outline' | 'layers'>('pages')
   const [outline, setOutline] = useState<OutlineNode[] | null>(null)
+  const pdf = doc.pages[0]?.source.pdf
+  const [hasLayers, setHasLayers] = useState(false)
+  useEffect(() => {
+    let alive = true
+    setHasLayers(false)
+    if (pdf) void listLayers(pdf).then((list) => alive && setHasLayers(list.length > 0))
+    return () => {
+      alive = false
+    }
+  }, [pdf])
+  useEffect(() => {
+    if (tab === 'layers' && !hasLayers) setTab('pages')
+  }, [tab, hasLayers])
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -120,6 +169,11 @@ export function FullViewSidebar({ doc, current, onGo }: SidebarProps): React.JSX
         >
           Outline
         </button>
+        {hasLayers && (
+          <button className={tab === 'layers' ? 'on' : ''} onClick={() => setTab('layers')}>
+            Layers
+          </button>
+        )}
       </div>
       <div className="fv-sidebar-body" ref={listRef}>
         {tab === 'pages' ? (
@@ -146,6 +200,8 @@ export function FullViewSidebar({ doc, current, onGo }: SidebarProps): React.JSX
               <span className="fv-thumb-number">{i + 1}</span>
             </button>
           ))
+        ) : tab === 'layers' && pdf ? (
+          <LayerList pdf={pdf} />
         ) : (
           <OutlineList nodes={outline ?? []} onGo={onGo} />
         )}

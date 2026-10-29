@@ -35,6 +35,8 @@ export interface SourceExportPage {
   comments?: CommentThread[]
   // Text recognized on a scanned page, laid under it invisibly.
   ocrWords?: OcrWord[]
+  // Names of the source's layers switched off in PDFx.
+  hiddenLayers?: string[]
   // Extra clockwise turn chosen in PDFx (0, 90, 180, 270).
   rotation?: number
 }

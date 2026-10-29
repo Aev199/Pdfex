@@ -940,6 +940,58 @@ test('Open Recent reopens a file and offers to continue where reading stopped', 
   }
 })
 
+test('drawing layers can be hidden, and stay in the export switched off', async () => {
+  const { app, page } = await launch(freshData(), [files.layered])
+  const out = join(work, 'layers.pdf')
+  // The colour of the reader page at a point (fractions of the page).
+  const colour = (fx, fy) =>
+    page.evaluate(
+      ([x, y]) => {
+        const canvas = document.querySelector('.full-page canvas')
+        const at = canvas
+          .getContext('2d')
+          .getImageData(Math.round(canvas.width * x), Math.round(canvas.height * y), 1, 1).data
+        return [at[0], at[1], at[2]]
+      },
+      [fx, fy]
+    )
+  try {
+    await rendered(page)
+    await page.locator('.canvas-world .page[data-page-id]').first().dblclick()
+    await page.waitForTimeout(1200)
+    if (!(await page.locator('.fv-sidebar').count())) await page.keyboard.press('F4')
+    await page.locator('.fv-sidebar-tabs button', { hasText: 'Layers' }).click()
+    assert.deepEqual(await texts(page, '.fv-layer span'), ['Арматура', 'Размеры'])
+    // The dimension line (blue) runs across the upper right.
+    const [r0, , b0] = await colour(0.7, 0.25)
+    assert.ok(b0 > 150 && r0 < 100, `before ${r0},${b0}`)
+    await page.locator('.fv-layer', { hasText: 'Размеры' }).locator('input').uncheck()
+    await page.waitForFunction(() => {
+      const canvas = document.querySelector('.full-page canvas')
+      const at = canvas
+        .getContext('2d')
+        .getImageData(Math.round(canvas.width * 0.7), Math.round(canvas.height * 0.25), 1, 1).data
+      return at[0] > 200 && at[2] > 200
+    })
+    // The reinforcement (red) is still there.
+    const [r1, g1] = await colour(50 / 600, 0.75)
+    assert.ok(r1 > 150 && g1 < 100, `rebar ${r1},${g1}`)
+
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await mockSaveDialog(app, out)
+    await menu(app, 'export-pdf')
+    for (let i = 0; i < 30 && !existsSync(out); i++) await page.waitForTimeout(200)
+  } finally {
+    await app.close()
+  }
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(out)) }).promise
+  const config = await doc.getOptionalContentConfig()
+  const state = Object.fromEntries([...config].map(([, g]) => [g.name, g.visible]))
+  assert.deepEqual(state, { Арматура: true, Размеры: false })
+})
+
 test('an Office document converts to PDF, or says what to install', async () => {
   const { app, page } = await launch(freshData(), [files.word])
   try {

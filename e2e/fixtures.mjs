@@ -1,6 +1,6 @@
 // Test documents, generated so the suite needs no binary fixtures: a
 // Cyrillic text report, a large-format drawing and a short second report.
-import { PDFDocument, rgb } from 'pdf-lib'
+import { PDFDocument, PDFHexString, PDFName, PDFNumber, PDFOperator, rgb } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -48,6 +48,49 @@ async function drawing() {
   return doc.save()
 }
 
+// A drawing with two layers (optional content groups), as CAD programs
+// export them: reinforcement drawn red, dimensions blue.
+export async function layeredDrawing() {
+  const doc = await PDFDocument.create()
+  const page = doc.addPage([600, 400])
+  const ocg = (name) =>
+    doc.context.register(doc.context.obj({ Type: 'OCG', Name: PDFHexString.fromText(name) }))
+  const rebar = ocg('Арматура')
+  const dims = ocg('Размеры')
+  page.node
+    .normalizedEntries()
+    .Resources.set(PDFName.of('Properties'), doc.context.obj({ L1: rebar, L2: dims }))
+  const op = (name, ...args) =>
+    PDFOperator.of(
+      name,
+      args.map((a) => (typeof a === 'number' ? PDFNumber.of(a) : a))
+    )
+  page.pushOperators(
+    op('BDC', PDFName.of('OC'), PDFName.of('L1')),
+    ...[op('q'), op('RG', 1, 0, 0), op('w', 12), op('re', 50, 50, 200, 100), op('S'), op('Q')],
+    op('EMC'),
+    op('BDC', PDFName.of('OC'), PDFName.of('L2')),
+    ...[
+      op('q'),
+      op('RG', 0, 0, 1),
+      op('w', 12),
+      op('m', 300, 300),
+      op('l', 550, 300),
+      op('S'),
+      op('Q')
+    ],
+    op('EMC')
+  )
+  doc.catalog.set(
+    PDFName.of('OCProperties'),
+    doc.context.obj({
+      OCGs: [rebar, dims],
+      D: { Order: [rebar, dims], ON: [rebar, dims] }
+    })
+  )
+  return doc.save()
+}
+
 // The smallest Word document Word and LibreOffice will open.
 function docx(paragraphs) {
   const body = paragraphs
@@ -71,8 +114,10 @@ export async function makeFixtures(dir) {
     report: join(dir, 'Технический отчёт ИГИ.pdf'),
     drawing: join(dir, 'КЖ лист 1.pdf'),
     second: join(dir, 'Расчёт MIDAS.pdf'),
-    word: join(dir, 'Пояснительная записка.docx')
+    word: join(dir, 'Пояснительная записка.docx'),
+    layered: join(dir, 'КЖ слои.pdf')
   }
+  writeFileSync(files.layered, await layeredDrawing())
   writeFileSync(
     files.word,
     docx(['Пояснительная записка', 'Расчётное сопротивление грунта R = 250 кПа'])

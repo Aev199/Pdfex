@@ -9,6 +9,7 @@ import type { TextLook } from '../elements/types'
 import type { ElementFonts } from './elements/fonts'
 import { registerAcroForm } from './form-fields'
 import { addCommentAnnotations } from './comments'
+import { writeLayers } from './layers-export'
 import { drawOcrText, ocrText } from './ocr-layer'
 import type { ExportDocument, ExportPage, PdfxManifest, RasterExportPage } from './format'
 
@@ -78,12 +79,16 @@ function turn(page: PDFPage, extra: number | undefined): void {
   page.setRotation(degrees((page.getRotation().angle + extra) % 360))
 }
 
+const hiddenOf = (pages: ExportPage[]): Set<string> =>
+  new Set(pages.flatMap((p) => (p.kind === 'source' ? (p.hiddenLayers ?? []) : [])))
+
 export async function buildPdf(pages: ExportPage[]): Promise<Uint8Array> {
   const output = await PDFDocument.create()
   const ctx = createContext(output)
   for (const page of pages) {
     await addExportPage(ctx, page)
   }
+  writeLayers(output, hiddenOf(pages))
   await registerAcroForm(output)
   output.setProducer(`PDFX ${PDFX_VERSION}`)
   return output.save()
@@ -101,6 +106,7 @@ export async function buildPdfx(documents: ExportDocument[], title: string): Pro
     }
     manifest.documents.push({ name: doc.name, pages: doc.pages.length })
   }
+  writeLayers(output, hiddenOf(documents.flatMap((d) => d.pages)))
 
   await registerAcroForm(output)
 

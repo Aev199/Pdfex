@@ -5,6 +5,7 @@ import { FULL_LEVELS, THUMB_LEVELS, nextLevel } from './page-view/raster-levels'
 import { enqueueRender } from './page-view/render-queue'
 import { track, viewing } from '../pdfx/pdf-activity'
 import { FindHighlight } from './find-highlight'
+import { useLayerVersion } from '../pdfx/layers'
 import type { OcrWord } from '../ocr/types'
 
 interface PageViewProps {
@@ -70,9 +71,16 @@ function PageViewImpl({
   const [baseReady, setBaseReady] = useState(false)
   // Long side of the raster on screen now (0: none) and the one wanted.
   const levelRef = useRef(0)
-  const drawnRef = useRef<{ pdf: PDFDocumentProxy; pageNumber: number; level: number } | null>(null)
+  const drawnRef = useRef<{
+    pdf: PDFDocumentProxy
+    pageNumber: number
+    level: number
+    layers: number
+  } | null>(null)
   const [level, setLevel] = useState(0)
   const levels = eager ? FULL_LEVELS : THUMB_LEVELS
+  // Switching the document's layers redraws its pages.
+  const layers = useLayerVersion(pdf)
 
   // In range or not; leaving range for a while frees the rasters.
   useEffect(() => {
@@ -148,7 +156,13 @@ function PageViewImpl({
     if (!near || level === 0) return
     // Already drawn for exactly this (a page coming back into range).
     const drawn = drawnRef.current
-    if (drawn && drawn.pdf === pdf && drawn.pageNumber === pageNumber && drawn.level === level) {
+    if (
+      drawn &&
+      drawn.pdf === pdf &&
+      drawn.pageNumber === pageNumber &&
+      drawn.level === level &&
+      drawn.layers === layers
+    ) {
       return
     }
     const root = rootRef.current
@@ -174,7 +188,7 @@ function PageViewImpl({
             onTask: (t) => (task = t),
             onReady: () => {
               levelRef.current = level
-              drawnRef.current = { pdf, pageNumber, level }
+              drawnRef.current = { pdf, pageNumber, level, layers }
               setBaseReady(true)
             }
           })
@@ -184,7 +198,7 @@ function PageViewImpl({
       cancelled = true
       task?.cancel()
     }
-  }, [near, level, pdf, pageNumber, naturalWidth, naturalHeight, eager, returned])
+  }, [near, level, pdf, pageNumber, naturalWidth, naturalHeight, eager, returned, layers])
 
   useEffect(() => {
     if (!near || !baseReady) return
@@ -234,7 +248,18 @@ function PageViewImpl({
       cancelled = true
       task?.cancel()
     }
-  }, [near, baseReady, level, version, detail, pdf, pageNumber, naturalWidth, naturalHeight])
+  }, [
+    near,
+    baseReady,
+    level,
+    version,
+    detail,
+    pdf,
+    pageNumber,
+    naturalWidth,
+    naturalHeight,
+    layers
+  ])
 
   return (
     <div className="pageview" ref={rootRef}>

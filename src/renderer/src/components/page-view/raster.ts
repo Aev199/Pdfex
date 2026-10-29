@@ -1,4 +1,5 @@
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
+import { layerConfig } from '../../pdfx/layers'
 
 export const MAX_DETAIL = 4096
 
@@ -48,7 +49,11 @@ export async function renderBase({
   const off = document.createElement('canvas')
   off.width = Math.max(1, Math.floor(viewport.width))
   off.height = Math.max(1, Math.floor(viewport.height))
-  const task = page.render({ canvas: off, viewport })
+  const task = page.render({
+    canvas: off,
+    viewport,
+    optionalContentConfigPromise: layerConfig(pdf)
+  })
   onTask(task)
   try {
     await task.promise
@@ -154,6 +159,7 @@ export async function renderDetail({
   const task = page.render({
     canvas: off,
     viewport,
+    optionalContentConfigPromise: layerConfig(pdf),
     transform: [1, 0, 0, 1, -(x0 / layoutW) * viewport.width, -(y0 / layoutH) * viewport.height]
   })
   onTask(task)

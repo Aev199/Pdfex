@@ -1904,3 +1904,57 @@
 .full-view.scrolling .full-bar {
   background: linear-gradient(rgba(19, 19, 22, 0.92), rgba(19, 19, 22, 0.6) 70%, transparent);
 }
+
+/* ── Layers (optional content) ─────────────────────────────────── */
+
+.fv-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.fv-layers-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.fv-layers-actions button {
+  flex: 1;
+  padding: 4px 0;
+  border: none;
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fv-layer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.fv-layer:hover {
+  background: var(--hover);
+}
+
+.fv-layer span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fv-layers-hint {
+  margin: 8px 6px 0;
+  color: var(--ink-faint);
+  font-size: 11.5px;
+}
