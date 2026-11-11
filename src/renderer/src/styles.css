@@ -409,6 +409,11 @@ a.btn {
   --min-font-size-inv: calc(1 / var(--min-font-size));
 }
 
+/* See useTextLayerRest: a heavy text layer is skipped while the view moves. */
+.find-layer[data-resting] {
+  visibility: hidden;
+}
+
 .find-layer > span {
   position: absolute;
   color: transparent;

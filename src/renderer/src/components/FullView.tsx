@@ -29,6 +29,7 @@ import { useFullViewControls } from './full-view/use-full-view-controls'
 import { useFullViewLayout } from './full-view/use-full-view-layout'
 import { useFullViewEffects } from './full-view/use-full-view-effects'
 import { useFullViewInput } from './full-view/use-full-view-input'
+import { useTextLayerRest } from './full-view/use-text-layer-rest'
 import { useEditMode } from './full-view/edit/use-edit-mode'
 import { ToolCursor } from './full-view/edit/ToolCursor'
 import { FullViewChrome } from './full-view/FullViewChrome'
@@ -199,6 +200,7 @@ export function FullView({
     setCurrent: s.setCurrent,
     setRenderVersion: s.setRenderVersion
   })
+  useTextLayerRest(s.scrollRef, s.view)
   useFullViewInput({
     scrollRef: s.scrollRef,
     zoomedRef: s.zoomedRef,
