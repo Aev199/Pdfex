@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { DocEntry } from '../../types'
 import type { View } from './geometry'
 import { clamp, pageAtScroll } from './geometry'
+import { cameraMoved } from '../page-view/render-queue'
 
 interface EffectsOptions {
   scrollRef: React.RefObject<HTMLDivElement | null>
@@ -63,6 +64,10 @@ export function useFullViewEffects(opts: EffectsOptions): void {
       return x === v.x && y === v.y ? v : { ...v, x, y }
     })
   }, [fit.w, fit.h, vw, vh])
+
+  useEffect(() => {
+    if (view.zoom > 1) cameraMoved()
+  }, [view])
 
   useEffect(() => {
     const timer = setTimeout(() => setRenderVersion((n) => n + 1), 180)

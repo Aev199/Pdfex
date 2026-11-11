@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import { dpr, logRenderError, renderBase, renderDetail, visibleGeometry } from './page-view/raster'
 import { FULL_LEVELS, THUMB_LEVELS, nextLevel } from './page-view/raster-levels'
-import { enqueueRender } from './page-view/render-queue'
+import { enqueueRender, scheduleSlices } from './page-view/render-queue'
 import { track, viewing } from '../pdfx/pdf-activity'
 import { FindHighlight } from './find-highlight'
 import type { OcrWord } from '../ocr/types'
@@ -155,8 +155,11 @@ function PageViewImpl({
     if (!root) return
     let cancelled = false
     let task: RenderTask | null = null
+    // Nothing on screen yet: draw even while the camera moves.
+    const urgent = levelRef.current === 0
     enqueueRender({
       priority: eager ? -1 : visibleNow(root) ? 0 : 1,
+      urgent,
       // A page that flew past (fast scrolling, turning pages in the reader)
       // before its turn came is not drawn at all.
       cancelled: () => cancelled || (!eager && !visibleNow(root, LOAD_MARGIN_PX)),
@@ -171,7 +174,10 @@ function PageViewImpl({
             cleanupAfter: !eager && (level <= SMALL_LEVEL || !visibleNow(root)),
             baseRef,
             isCancelled: () => cancelled,
-            onTask: (t) => (task = t),
+            onTask: (t) => {
+              task = t
+              scheduleSlices(t, urgent)
+            },
             onReady: () => {
               levelRef.current = level
               drawnRef.current = { pdf, pageNumber, level }
@@ -226,7 +232,10 @@ function PageViewImpl({
             geometry,
             detailCanvas,
             isCancelled: () => cancelled,
-            onTask: (t) => (task = t)
+            onTask: (t) => {
+              task = t
+              scheduleSlices(t, false)
+            }
           })
         ).catch(logRenderError(`Failed to render detail for page ${pageNumber}`))
     })

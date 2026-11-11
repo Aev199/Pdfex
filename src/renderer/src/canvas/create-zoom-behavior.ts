@@ -1,6 +1,7 @@
 import { zoom as d3zoom, type ZoomBehavior } from 'd3-zoom'
 import { reversibleConstrain } from './constrain'
 import { MIN_SCALE, MAX_SCALE } from './zoom-constants'
+import { cameraMoved } from '../components/page-view/render-queue'
 
 interface ZoomHandlerRefs {
   vp: HTMLDivElement
@@ -32,6 +33,7 @@ export function createZoomBehavior(refs: ZoomHandlerRefs): ZoomBehavior<HTMLDivE
     .on('end', () => vp.classList.remove('panning'))
     .on('zoom', (event) => {
       if (event.sourceEvent) userMovedRef.current = true
+      cameraMoved()
       const t = event.transform
       const world = worldRef.current
       if (world) {
