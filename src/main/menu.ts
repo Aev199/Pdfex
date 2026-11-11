@@ -1,5 +1,27 @@
-import { Menu } from 'electron'
+import { Menu, webContents } from 'electron'
+import { safePaste } from './clipboard'
+import { basename, dirname } from 'path'
+import { clearRecent, recentFiles } from './recent'
+import { sendOpenPaths } from './window'
 import { getMainWindow, toggleDevTools } from './window'
+
+function recentMenu(): Electron.MenuItemConstructorOptions[] {
+  const files = recentFiles()
+  if (files.length === 0) return [{ label: 'No recent files', enabled: false }]
+  return [
+    ...files.map(
+      (path, i): Electron.MenuItemConstructorOptions => ({
+        // "&" would turn the next letter into a menu shortcut.
+        label: `${i < 9 ? `&${i + 1} ` : ''}${basename(path).replace(/&/g, '&&')}`,
+        sublabel: dirname(path),
+        toolTip: path,
+        click: () => void sendOpenPaths([path])
+      })
+    ),
+    { type: 'separator' },
+    { label: 'Clear Recent', click: () => clearRecent() }
+  ]
+}
 
 export function buildMenu(): void {
   const sendZoom = (action: 'in' | 'out' | 'reset') => (): void => {
@@ -16,6 +38,7 @@ export function buildMenu(): void {
       label: 'File',
       submenu: [
         { id: 'open', label: 'Open…', accelerator: 'CommandOrControl+O', click: sendMenu('open') },
+        { label: 'Open Recent', submenu: recentMenu() },
         { type: 'separator' },
         {
           id: 'export-pdfx',
@@ -40,7 +63,29 @@ export function buildMenu(): void {
         process.platform === 'darwin' ? { role: 'close' as const } : { role: 'quit' as const }
       ]
     },
-    { role: 'editMenu' },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        {
+          label: 'Paste',
+          accelerator: 'CommandOrControl+V',
+          // The page takes the key itself (see paste-guard in the renderer).
+          registerAccelerator: false,
+          click: () => {
+            const contents = webContents.getFocusedWebContents() ?? getMainWindow()?.webContents
+            if (contents) void safePaste(contents)
+          }
+        },
+        { role: 'delete' },
+        { type: 'separator' },
+        { role: 'selectAll' }
+      ]
+    },
     {
       label: 'View',
       submenu: [

@@ -35,9 +35,13 @@ export async function crash(app) {
   await new Promise((resolve) => setTimeout(resolve, 2000))
 }
 
+// Pages drawn, and every file being opened has arrived (its placeholder row
+// is gone), so counts of documents and pages are final.
 export const rendered = (page, count = 1) =>
   page.waitForFunction(
-    (n) => document.querySelectorAll('.pageview-base.ready').length >= n,
+    (n) =>
+      document.querySelectorAll('.pageview-base.ready').length >= n &&
+      document.querySelectorAll('.skeleton-row').length === 0,
     count,
     {
       timeout: 60_000

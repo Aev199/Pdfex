@@ -19,6 +19,7 @@ interface DocLayerProps {
   pagesDraggable: boolean
   collapsedId: string | null
   liftedId: string | null
+  draggingGroup: boolean
   draggingPage: PageRef | null
   hiddenPageId: string | null
   marks: MarkMap
@@ -35,7 +36,7 @@ interface DocLayerProps {
   onDocContextMenu: (docId: string, x: number, y: number) => void
   onHoverDoc: (docId: string | null) => void
   onOpenPage: (docId: string, pageId: string) => void
-  onPageDragStart: (docId: string, pageId: string) => void
+  onPageDragStart: (docId: string, pageId: string) => number | void
   onPageDragEnd: () => void
   onAddPage: (docId: string) => void
 }
@@ -75,6 +76,7 @@ function DocLayerImpl(props: DocLayerProps): React.JSX.Element {
               collapseId={
                 props.collapsedId && props.draggingPage?.docId === doc.id ? props.collapsedId : null
               }
+              draggingGroup={props.draggingGroup}
               liftedId={
                 props.liftedId && props.draggingPage?.docId === doc.id ? props.liftedId : null
               }

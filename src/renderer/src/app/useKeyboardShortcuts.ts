@@ -40,7 +40,10 @@ export function useKeyboardShortcuts({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const mod = event.metaKey || event.ctrlKey
-      const key = event.key.toLowerCase()
+      // By key position, so the shortcuts also work in the Russian layout.
+      const key = event.code.startsWith('Key')
+        ? event.code.slice(3).toLowerCase()
+        : event.key.toLowerCase()
       if (mod && key === 'f' && !isEditableTarget(event.target)) {
         event.preventDefault()
         onOpenFind()

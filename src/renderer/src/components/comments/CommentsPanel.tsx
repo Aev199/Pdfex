@@ -83,7 +83,9 @@ export function CommentsPanel(props: CommentsPanelProps): React.JSX.Element {
           <CloseIcon size={14} />
         </button>
       </header>
-      {placing && <p className="comments-hint">Click the page where the comment goes · Esc cancels</p>}
+      {placing && (
+        <p className="comments-hint">Click the page where the comment goes · Esc cancels</p>
+      )}
       <label className="comments-filter">
         <input
           type="checkbox"
@@ -249,6 +251,7 @@ function Message({
         <span className="comment-when" title={new Date(message.createdAt).toLocaleString()}>
           {formatWhen(message.createdAt)}
           {message.editedAt ? ' · edited' : ''}
+          {message.origin ? ' · in the file' : ''}
         </span>
         {resolve}
       </div>
@@ -266,26 +269,28 @@ function Message({
       ) : (
         <>
           <div className="comment-text">{message.text}</div>
-          <div className="comment-tools">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setEditing(true)
-              }}
-            >
-              Edit
-            </button>
-            <button
-              className={confirming ? 'danger' : ''}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (confirming) onRemove()
-                else setConfirming(true)
-              }}
-            >
-              {confirming ? `${removeLabel}?` : removeLabel}
-            </button>
-          </div>
+          {!message.origin && (
+            <div className="comment-tools">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setEditing(true)
+                }}
+              >
+                Edit
+              </button>
+              <button
+                className={confirming ? 'danger' : ''}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (confirming) onRemove()
+                  else setConfirming(true)
+                }}
+              >
+                {confirming ? `${removeLabel}?` : removeLabel}
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

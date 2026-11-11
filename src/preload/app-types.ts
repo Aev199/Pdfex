@@ -21,6 +21,11 @@ export interface Settings {
   commentAuthor: string
   // Exported scans get their recognized text as an invisible layer.
   exportOcr: boolean
+  // Windows: PDFx is offered for PDFs (Open with, Explorer menu).
+  openPdfs: boolean
+  // Exported marks and drawings: part of the page, or annotations other
+  // programs can move and delete.
+  exportAnnotations: 'page' | 'editable'
 }
 
 export interface AppInfo {

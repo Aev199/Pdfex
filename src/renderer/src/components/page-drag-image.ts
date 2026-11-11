@@ -1,4 +1,5 @@
-export function buildPageDragImage(pageEl: HTMLElement, rect: DOMRect): HTMLElement {
+// `count` > 1: several pages travel; the picture says how many.
+export function buildPageDragImage(pageEl: HTMLElement, rect: DOMRect, count = 1): HTMLElement {
   const w = rect.width
   const h = rect.height
   const k = pageEl.offsetHeight ? h / pageEl.offsetHeight : 1
@@ -27,6 +28,28 @@ export function buildPageDragImage(pageEl: HTMLElement, rect: DOMRect): HTMLElem
     wrap.appendChild(c)
   }
 
+  if (count > 1) {
+    // A second sheet peeking out behind, and the number.
+    wrap.style.boxShadow = `${6 * k}px ${6 * k}px 0 -${1 * k}px rgba(255, 255, 255, 0.85)`
+    wrap.style.overflow = 'visible'
+    const badge = document.createElement('div')
+    badge.textContent = String(count)
+    Object.assign(badge.style, {
+      position: 'absolute',
+      top: '-8px',
+      right: '-8px',
+      minWidth: '22px',
+      height: '22px',
+      padding: '0 6px',
+      borderRadius: '11px',
+      background: '#4483f7',
+      color: '#fff',
+      font: '600 12px/22px system-ui, sans-serif',
+      textAlign: 'center',
+      boxSizing: 'border-box'
+    })
+    wrap.appendChild(badge)
+  }
   document.body.appendChild(wrap)
   return wrap
 }

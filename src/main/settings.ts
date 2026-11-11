@@ -16,7 +16,9 @@ export const DEFAULT_SETTINGS: Settings = {
   office: 'auto',
   restoreSession: true,
   commentAuthor: '',
-  exportOcr: true
+  exportOcr: true,
+  openPdfs: false,
+  exportAnnotations: 'page'
 }
 
 // The Windows account name signs comments until the user picks a name.
@@ -32,6 +34,10 @@ function accountName(): string {
 interface UpdaterMemory {
   skippedVersion?: string
   checkedAt?: number
+  // The open command last written for "Open PDFs in PDFx" (Windows).
+  associatedCommand?: string
+  // File → Open Recent, newest first.
+  recentFiles?: string[]
 }
 
 interface Stored extends Settings, UpdaterMemory {}
@@ -59,10 +65,17 @@ export function sanitize(raw: unknown): Stored {
       typeof input.commentAuthor === 'string' && input.commentAuthor.trim()
         ? input.commentAuthor.trim().slice(0, 60)
         : accountName(),
-    exportOcr: pick('exportOcr', (v) => typeof v === 'boolean')
+    exportOcr: pick('exportOcr', (v) => typeof v === 'boolean'),
+    openPdfs: pick('openPdfs', (v) => typeof v === 'boolean'),
+    exportAnnotations: pick('exportAnnotations', oneOf(['page', 'editable']))
   }
   if (typeof input.skippedVersion === 'string') result.skippedVersion = input.skippedVersion
   if (typeof input.checkedAt === 'number') result.checkedAt = input.checkedAt
+  if (typeof input.associatedCommand === 'string')
+    result.associatedCommand = input.associatedCommand
+  if (Array.isArray(input.recentFiles)) {
+    result.recentFiles = input.recentFiles.filter((p): p is string => typeof p === 'string')
+  }
   return result
 }
 
@@ -91,7 +104,13 @@ function persist(): Promise<void> {
 }
 
 export function getSettings(): Settings {
-  const { skippedVersion: _s, checkedAt: _c, ...settings } = load()
+  const {
+    skippedVersion: _s,
+    checkedAt: _c,
+    associatedCommand: _a,
+    recentFiles: _r,
+    ...settings
+  } = load()
   return settings
 }
 
@@ -109,8 +128,8 @@ export function onSettingsChanged(listener: (settings: Settings) => void): () =>
 }
 
 export function updaterMemory(): UpdaterMemory {
-  const { skippedVersion, checkedAt } = load()
-  return { skippedVersion, checkedAt }
+  const { skippedVersion, checkedAt, associatedCommand, recentFiles } = load()
+  return { skippedVersion, checkedAt, associatedCommand, recentFiles }
 }
 
 export function rememberForUpdater(patch: UpdaterMemory): void {

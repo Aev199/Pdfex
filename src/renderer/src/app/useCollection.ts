@@ -19,6 +19,15 @@ export interface SelectModifiers {
   range?: boolean
 }
 
+// Copied page id -> the original's, in the group's document order.
+function copyOrigins(docs: DocEntry[], refs: PageRef[], copyIds: string[]): Map<string, string> {
+  const ids = new Set(refs.map((r) => r.pageId))
+  const ordered = docs.flatMap((d) => d.pages.filter((p) => ids.has(p.id)))
+  return new Map(
+    copyIds.map((copy, i) => [copy, ordered[i]?.id]).filter((e): e is [string, string] => !!e[1])
+  )
+}
+
 export function useCollection(
   flash: (message: string) => void,
   pushUndo: (entry: UndoEntry) => void,
@@ -363,6 +372,80 @@ export function useCollection(
     [commit, setSelected]
   )
 
+  // Several selected pages dragged together: one undo step, and they stay
+  // selected where they land. Copies return new id -> original id.
+  const selectGroup = useCallback((refs: PageRef[]) => {
+    if (refs.length === 0) return
+    setSelection(refs)
+    selectedRef.current = refs[refs.length - 1]
+    setSelectedState(refs[refs.length - 1])
+  }, [])
+  const refsIn = (docs: DocEntry[], ids: string[]): PageRef[] =>
+    selOps.allPages(docs).filter((r) => ids.includes(r.pageId))
+
+  const moveGroupInto = useCallback(
+    (refs: PageRef[], grabbedId: string, targetDocId: string, index: number) => {
+      const next = moveOps.movePagesInto(docsRef.current, refs, grabbedId, targetDocId, index)
+      commit(next, true)
+      selectGroup(
+        refsIn(
+          next,
+          refs.map((r) => r.pageId)
+        )
+      )
+    },
+    [commit, selectGroup]
+  )
+
+  const moveGroupToNewDoc = useCallback(
+    (refs: PageRef[], grabbed: PageRef, docIndex: number) => {
+      const next = moveOps.movePagesToNewDoc(
+        docsRef.current,
+        refs,
+        grabbed,
+        docIndex,
+        crypto.randomUUID()
+      )
+      commit(next, true)
+      selectGroup(
+        refsIn(
+          next,
+          refs.map((r) => r.pageId)
+        )
+      )
+    },
+    [commit, selectGroup]
+  )
+
+  const copyGroupInto = useCallback(
+    (refs: PageRef[], targetDocId: string, index: number): Map<string, string> => {
+      const copyIds = refs.map(() => crypto.randomUUID())
+      const next = moveOps.copyPagesInto(docsRef.current, refs, copyIds, targetDocId, index)
+      commit(next, true)
+      selectGroup(refsIn(next, copyIds))
+      return copyOrigins(docsRef.current, refs, copyIds)
+    },
+    [commit, selectGroup]
+  )
+
+  const copyGroupToNewDoc = useCallback(
+    (refs: PageRef[], grabbed: PageRef, docIndex: number): Map<string, string> => {
+      const copyIds = refs.map(() => crypto.randomUUID())
+      const next = moveOps.copyPagesToNewDoc(
+        docsRef.current,
+        refs,
+        copyIds,
+        grabbed,
+        docIndex,
+        crypto.randomUUID()
+      )
+      commit(next, true)
+      selectGroup(refsIn(next, copyIds))
+      return copyOrigins(docsRef.current, refs, copyIds)
+    },
+    [commit, selectGroup]
+  )
+
   const placePageAt = useCallback(
     (pageId: string, at: PagePlacement) => {
       const prev = docsRef.current
@@ -457,6 +540,10 @@ export function useCollection(
     movePageToNewDoc,
     copyPageInto,
     copyPageToNewDoc,
+    moveGroupInto,
+    moveGroupToNewDoc,
+    copyGroupInto,
+    copyGroupToNewDoc,
     placePageAt,
     replacePageSource,
     applyPageSource,

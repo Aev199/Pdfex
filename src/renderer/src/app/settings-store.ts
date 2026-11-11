@@ -12,7 +12,9 @@ export const DEFAULT_SETTINGS: Settings = {
   office: 'auto',
   restoreSession: true,
   commentAuthor: '',
-  exportOcr: true
+  exportOcr: true,
+  openPdfs: false,
+  exportAnnotations: 'page'
 }
 
 let current: Settings = DEFAULT_SETTINGS

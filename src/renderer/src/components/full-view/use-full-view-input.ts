@@ -11,6 +11,8 @@ interface InputOptions extends FullViewControls {
   viewRef: React.MutableRefObject<View>
   phaseRef: React.MutableRefObject<'opening' | 'open' | 'closing'>
   editingRef: React.MutableRefObject<boolean>
+  // The scrolling layouts handle keys, wheel and zoom themselves.
+  continuousRef: React.MutableRefObject<boolean>
   finishEdit: () => void
 }
 
@@ -20,7 +22,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 }
 
 export function useFullViewInput(opts: InputOptions): void {
-  const { scrollRef, zoomedRef, viewRef, phaseRef, editingRef, finishEdit } = opts
+  const { scrollRef, zoomedRef, viewRef, phaseRef, editingRef, continuousRef, finishEdit } = opts
   const { resetView, applyZoom, panBy, navByKey, runClose } = opts
 
   useEffect(() => {
@@ -31,7 +33,7 @@ export function useFullViewInput(opts: InputOptions): void {
         else runClose()
         return
       }
-      if (phaseRef.current !== 'open') return
+      if (phaseRef.current !== 'open' || continuousRef.current) return
       if (zoomedRef.current) {
         if (event.key === 'ArrowLeft') panBy(ARROW_PAN, 0)
         else if (event.key === 'ArrowRight') panBy(-ARROW_PAN, 0)
@@ -52,7 +54,7 @@ export function useFullViewInput(opts: InputOptions): void {
 
   useEffect(() => {
     return window.api.onZoom((action) => {
-      if (phaseRef.current !== 'open') return
+      if (phaseRef.current !== 'open' || continuousRef.current) return
       if (action === 'in') applyZoom((z) => z * ZOOM_STEP)
       else if (action === 'out') applyZoom((z) => z / ZOOM_STEP)
       else resetView()

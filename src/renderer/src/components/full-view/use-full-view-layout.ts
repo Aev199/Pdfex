@@ -8,6 +8,8 @@ interface LayoutOptions {
   originRect: Rect | null
   vw: number
   vh: number
+  // Back from a scrolling layout: the page scroller is new.
+  layout: string
   setPhase: (phase: 'opening' | 'open' | 'closing') => void
   setFlip: (flip: string | null) => void
   setFlipTransition: (on: boolean) => void
@@ -15,7 +17,7 @@ interface LayoutOptions {
 }
 
 export function useFullViewLayout(opts: LayoutOptions): void {
-  const { scrollRef, curRef, originRect, vw, vh } = opts
+  const { scrollRef, curRef, originRect, vw, vh, layout } = opts
   const { setPhase, setFlip, setFlipTransition, setRevealed } = opts
 
   useLayoutEffect(() => {
@@ -23,7 +25,7 @@ export function useFullViewLayout(opts: LayoutOptions): void {
     if (!sc) return
     const top = slideTop(sc, curRef.current.di, curRef.current.pi)
     if (top !== null) sc.scrollTop = top
-  }, [vw, vh])
+  }, [vw, vh, layout])
 
   useLayoutEffect(() => {
     const raf = requestAnimationFrame(() => {

@@ -122,3 +122,120 @@ export function placePage(docs: DocEntry[], pageId: string, at: PagePlacement): 
   const restored: DocEntry = { id: at.docId, name: at.docName, pages: [page] }
   return [...remaining.slice(0, insertAt), restored, ...remaining.slice(insertAt)]
 }
+
+// Several selected pages dragged at once. The drop index is counted the way
+// the canvas shows it while dragging: in the target document without the
+// grabbed page. The group lands, in document order, before the first page
+// there that isn't moving (or at the end).
+function anchorAfterDrop(
+  doc: DocEntry,
+  grabbedId: string,
+  index: number,
+  moving: Set<string>
+): string | null {
+  const shown = doc.pages.filter((p) => p.id !== grabbedId)
+  return shown.slice(Math.max(0, index)).find((p) => !moving.has(p.id))?.id ?? null
+}
+
+const pagesOf = (docs: DocEntry[], refs: PageRef[]): DocEntry['pages'] => {
+  const ids = new Set(refs.map((r) => r.pageId))
+  return docs.flatMap((d) => d.pages.filter((p) => ids.has(p.id)))
+}
+
+function insertBefore(
+  pages: DocEntry['pages'],
+  anchorId: string | null,
+  group: DocEntry['pages']
+): DocEntry['pages'] {
+  const at = anchorId === null ? pages.length : pages.findIndex((p) => p.id === anchorId)
+  const i = at === -1 ? pages.length : at
+  return [...pages.slice(0, i), ...group, ...pages.slice(i)]
+}
+
+export function movePagesInto(
+  docs: DocEntry[],
+  refs: PageRef[],
+  grabbedId: string,
+  targetDocId: string,
+  index: number
+): DocEntry[] {
+  const target = docs.find((d) => d.id === targetDocId)
+  const group = pagesOf(docs, refs)
+  if (!target || group.length === 0) return docs
+  const moving = new Set(group.map((p) => p.id))
+  const anchor = anchorAfterDrop(target, grabbedId, index, moving)
+  const next = docs
+    .map((d) => {
+      const kept = d.pages.filter((p) => !moving.has(p.id))
+      return d.id === targetDocId
+        ? { ...d, pages: insertBefore(kept, anchor, group) }
+        : { ...d, pages: kept }
+    })
+    .filter((d) => d.pages.length > 0)
+  const same =
+    next.length === docs.length &&
+    next.every(
+      (d, i) =>
+        d.pages.length === docs[i].pages.length && d.pages.every((p, j) => p === docs[i].pages[j])
+    )
+  return same ? docs : next
+}
+
+// Before the document at `docIndex` (counted with every document present).
+export function movePagesToNewDoc(
+  docs: DocEntry[],
+  refs: PageRef[],
+  grabbed: PageRef,
+  docIndex: number,
+  newDocId: string
+): DocEntry[] {
+  const group = pagesOf(docs, refs)
+  const from = docs.find((d) => d.id === grabbed.docId)
+  if (group.length === 0 || !from) return docs
+  const moving = new Set(group.map((p) => p.id))
+  const before = docs.slice(Math.max(0, docIndex)).map((d) => d.id)
+  const remaining = docs
+    .map((d) => ({ ...d, pages: d.pages.filter((p) => !moving.has(p.id)) }))
+    .filter((d) => d.pages.length > 0)
+  const anchor = before.find((id) => remaining.some((d) => d.id === id))
+  const at = anchor ? remaining.findIndex((d) => d.id === anchor) : remaining.length
+  const name = uniqueDocName(from.name, new Set(remaining.map((d) => d.name)))
+  return [...remaining.slice(0, at), { id: newDocId, name, pages: group }, ...remaining.slice(at)]
+}
+
+// Ctrl-drag of several pages: copies (new ids, in `copyIds` order) land at
+// the drop target; the originals stay.
+export function copyPagesInto(
+  docs: DocEntry[],
+  refs: PageRef[],
+  copyIds: string[],
+  targetDocId: string,
+  index: number
+): DocEntry[] {
+  const target = docs.find((d) => d.id === targetDocId)
+  const group = pagesOf(docs, refs)
+  if (!target || group.length === 0) return docs
+  // Copying keeps the grabbed page where it was, so the index counts it.
+  const copies = group.map((p, i) => ({ ...p, id: copyIds[i] }))
+  const anchor = target.pages[Math.max(0, index)]?.id ?? null
+  return docs.map((d) =>
+    d.id === targetDocId ? { ...d, pages: insertBefore(d.pages, anchor, copies) } : d
+  )
+}
+
+export function copyPagesToNewDoc(
+  docs: DocEntry[],
+  refs: PageRef[],
+  copyIds: string[],
+  grabbed: PageRef,
+  docIndex: number,
+  newDocId: string
+): DocEntry[] {
+  const group = pagesOf(docs, refs)
+  const from = docs.find((d) => d.id === grabbed.docId)
+  if (group.length === 0 || !from) return docs
+  const name = uniqueDocName(from.name, new Set(docs.map((d) => d.name)))
+  const copies = group.map((p, i) => ({ ...p, id: copyIds[i] }))
+  const at = Math.max(0, Math.min(docs.length, docIndex))
+  return [...docs.slice(0, at), { id: newDocId, name, pages: copies }, ...docs.slice(at)]
+}

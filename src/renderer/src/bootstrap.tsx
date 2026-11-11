@@ -21,6 +21,28 @@ export function mountPdfxApp(container: HTMLElement): void {
     },
     { capture: true }
   )
+  // Chromium's own Ctrl+V reads a copied file list and, in Electron 44,
+  // crashes on non-ASCII file names. The canvas pastes files itself (as
+  // documents); text fields paste through the main process, which leaves
+  // file lists alone.
+  if (!isWeb) {
+    window.addEventListener(
+      'keydown',
+      (event) => {
+        const paste =
+          ((event.ctrlKey || event.metaKey) && !event.altKey && event.code === 'KeyV') ||
+          (event.shiftKey && event.key === 'Insert')
+        if (!paste) return
+        event.preventDefault()
+        const target = event.target as HTMLElement | null
+        const field =
+          !!target &&
+          (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+        if (field) void window.api.pasteText()
+      },
+      { capture: true }
+    )
+  }
   const pdfWorker = new Worker(new URL('./pdf.worker.ts', import.meta.url), { type: 'module' })
   GlobalWorkerOptions.workerPort = pdfWorker
   const mount = (): void =>

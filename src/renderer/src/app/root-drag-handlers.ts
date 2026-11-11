@@ -16,6 +16,7 @@ export interface RootDragDeps {
   canvasRef: React.RefObject<CanvasHandle | null>
   dragKind: 'internal' | 'external' | null
   draggingPage: PageRef | null
+  group: PageRef[] | null
   dropTarget: DropTarget | null
   collapsedId: string | null
   externalCount: number
@@ -30,6 +31,10 @@ export interface RootDragDeps {
   movePageToNewDoc: (source: PageRef, docIndex: number) => void
   copyPageInto: (source: PageRef, targetDocId: string, index: number) => void
   copyPageToNewDoc: (source: PageRef, docIndex: number) => void
+  moveGroupInto: (refs: PageRef[], grabbedId: string, targetDocId: string, index: number) => void
+  moveGroupToNewDoc: (refs: PageRef[], grabbed: PageRef, docIndex: number) => void
+  copyGroupInto: (refs: PageRef[], targetDocId: string, index: number) => void
+  copyGroupToNewDoc: (refs: PageRef[], grabbed: PageRef, docIndex: number) => void
   setCopying: (copying: boolean) => void
   // The pointer is over the page's own place: nothing moves yet.
   setHome: (home: boolean) => void
@@ -112,8 +117,21 @@ export function createRootDragHandlers(deps: RootDragDeps): RootDragHandlers {
       const copy = isCopyDrag(event)
       const target = w ? internalTarget(w, copy) : deps.dropTarget
       const home = w ? isHome(w, target!, copy) : false
+      const group = deps.group
       deps.clearDrag()
       if (home) return
+      if (group) {
+        if (copy) {
+          if (target?.kind === 'into') deps.copyGroupInto(group, target.docId, target.index)
+          else if (target?.kind === 'between')
+            deps.copyGroupToNewDoc(group, source, target.docIndex)
+        } else if (target?.kind === 'into') {
+          deps.moveGroupInto(group, source.pageId, target.docId, target.index)
+        } else if (target?.kind === 'between') {
+          deps.moveGroupToNewDoc(group, source, target.docIndex)
+        }
+        return
+      }
       if (copy) {
         if (target?.kind === 'into') deps.copyPageInto(source, target.docId, target.index)
         else if (target?.kind === 'between') deps.copyPageToNewDoc(source, target.docIndex)

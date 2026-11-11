@@ -44,6 +44,36 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
         <p className="settings-hint">Touchpad gestures work the same either way.</p>
       </section>
 
+      {window.api.platform === 'win32' && (
+        <section className="settings-section">
+          <h3>PDF files</h3>
+          <label className="settings-choice">
+            <input
+              type="checkbox"
+              checked={settings.openPdfs}
+              onChange={(e) => void changeSettings({ openPdfs: e.target.checked })}
+            />
+            <span>Open PDFs in PDFx (Open with and the Explorer menu)</span>
+          </label>
+          <div className="settings-row">
+            <span className="settings-hint">
+              Windows lets only you choose the default PDF program.
+            </span>
+            <button
+              className="btn"
+              disabled={!settings.openPdfs}
+              onClick={() => void window.api.openDefaultApps()}
+            >
+              Make default…
+            </button>
+          </div>
+          <p className="settings-hint">
+            Written for your Windows account only, no administrator rights needed; turning it off
+            removes it.
+          </p>
+        </section>
+      )}
+
       <section className="settings-section">
         <h3>Start</h3>
         <label className="settings-choice">
@@ -93,6 +123,31 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
           Scanned pages are recognized before export and get their text as an invisible layer, so
           the PDF can be searched and copied from anywhere. Pages with hidden text are left as they
           are.
+        </p>
+      </section>
+
+      <section className="settings-section">
+        <h3>Export</h3>
+        <label className="settings-choice">
+          <input
+            type="radio"
+            name="exportAnnotations"
+            checked={settings.exportAnnotations === 'page'}
+            onChange={() => void changeSettings({ exportAnnotations: 'page' })}
+          />
+          <span>Marks and drawings become part of the page</span>
+        </label>
+        <label className="settings-choice">
+          <input
+            type="radio"
+            name="exportAnnotations"
+            checked={settings.exportAnnotations === 'editable'}
+            onChange={() => void changeSettings({ exportAnnotations: 'editable' })}
+          />
+          <span>As annotations others can move or delete (Acrobat, Foxit)</span>
+        </label>
+        <p className="settings-hint">
+          Hidden text is always burned into the page. Comments are always exported as notes.
         </p>
       </section>
 

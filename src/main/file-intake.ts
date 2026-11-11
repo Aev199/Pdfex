@@ -1,4 +1,5 @@
 import { basename, join, resolve } from 'path'
+import { rememberOpened } from './recent'
 import { existsSync } from 'fs'
 import { readFile, readdir, stat } from 'fs/promises'
 import { grantReadPath } from './source-files'
@@ -26,6 +27,7 @@ export function collectFileArgs(argv: string[], cwd = process.cwd()): string[] {
 }
 
 export async function readFiles(paths: string[]): Promise<OpenedFile[]> {
+  rememberOpened(paths)
   return Promise.all(
     paths.map(async (p) => {
       const info = await stat(p)

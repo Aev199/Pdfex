@@ -16,6 +16,9 @@ export interface CommentReply {
   createdAt: string
   editedAt?: string
   text: string
+  // Read from the PDF (its annotation id there, like "15R"): someone else's
+  // words, kept as they are in the file; not edited or deleted here.
+  origin?: string
 }
 
 export interface CommentThread extends CommentReply {
@@ -25,6 +28,8 @@ export interface CommentThread extends CommentReply {
   resolved: boolean
   resolvedBy?: string
   resolvedAt?: string
+  // For a thread read from the PDF: whether the file already marks it done.
+  resolvedInFile?: boolean
 }
 
 // Threads by page id, as marks and elements.

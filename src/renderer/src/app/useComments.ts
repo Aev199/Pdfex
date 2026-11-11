@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import type { CommentMap, CommentPoint } from '../comments/types'
+import type { CommentMap, CommentPoint, CommentThread } from '../comments/types'
 import {
   createReply,
   createThread,
@@ -72,7 +72,24 @@ export function useComments(initial: CommentMap = {}) {
     [commit]
   )
 
-  return { comments, commentsRef, addThread, reply, editText, remove, resolve }
+  // Comments read from a PDF: added once (the same annotation never twice).
+  const importThreads = useCallback(
+    (byPage: Map<string, CommentThread[]>) => {
+      const map = { ...commentsRef.current }
+      let changed = false
+      for (const [pageId, threads] of byPage) {
+        const have = new Set((map[pageId] ?? []).map((t) => t.origin).filter(Boolean))
+        const fresh = threads.filter((t) => !have.has(t.origin))
+        if (fresh.length === 0) continue
+        map[pageId] = [...(map[pageId] ?? []), ...fresh]
+        changed = true
+      }
+      if (changed) commit(map)
+    },
+    [commit]
+  )
+
+  return { comments, commentsRef, addThread, reply, editText, remove, resolve, importThreads }
 }
 
 export type CommentState = ReturnType<typeof useComments>

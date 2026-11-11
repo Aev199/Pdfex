@@ -11,6 +11,8 @@ import { useFullView } from './app/useFullView'
 import { useMarks } from './app/useMarks'
 import { useComments } from './app/useComments'
 import { rotateKey } from './app/rotate-keys'
+import { lastPosition, rememberPosition } from './app/reading-positions'
+import { readPdfComments } from './comments/import'
 import { CompareView } from './components/compare/CompareView'
 import type { ComparePage } from './components/compare/CompareView'
 import { useFormValues } from './app/useFormValues'
@@ -141,6 +143,59 @@ export function WorkspaceView({
     [collection, markState, elementState, commentState, formState, undoStack, initial.view, flash]
   )
   const fullViewState = useFullView()
+  const openPageRef = useRef(fullViewState.openPage)
+  openPageRef.current = fullViewState.openPage
+
+  // Where each file was last read, and an offer to continue there when it is
+  // opened again (documents already here when the tab mounts don't ask).
+  const readingPage = fullViewState.fullView ? fullViewState.hiddenPageId : null
+  useEffect(() => {
+    if (!readingPage) return
+    for (const doc of collection.docsRef.current) {
+      const page = doc.pages.find((p) => p.id === readingPage)
+      if (page?.source.path) rememberPosition(page.source.path, page.pageIndex)
+    }
+  }, [readingPage, collection.docsRef])
+  const seenDocs = useRef(new Set(initial.docs.map((d) => d.id)))
+  // Comments in a newly opened file join the comment panel (once per file:
+  // copies of its pages don't read them again).
+  const seenSources = useRef(new Set(initial.docs.flatMap((d) => d.pages.map((p) => p.source.id))))
+  const { importThreads } = commentState
+  useEffect(() => {
+    const pages = collection.docs
+      .flatMap((d) => d.pages)
+      .filter((p) => !seenSources.current.has(p.source.id))
+    if (pages.length === 0) return
+    for (const p of pages) seenSources.current.add(p.source.id)
+    void (async () => {
+      const found = new Map<string, Awaited<ReturnType<typeof readPdfComments>>>()
+      for (const page of pages) {
+        const threads = await readPdfComments(page).catch(() => [])
+        if (threads.length > 0) found.set(page.id, threads)
+      }
+      if (found.size > 0) importThreads(found)
+    })()
+  }, [collection.docs, importThreads])
+  const [resume, setResume] = useState<{
+    docId: string
+    pageId: string
+    name: string
+    number: number
+  } | null>(null)
+  useEffect(() => {
+    for (const doc of collection.docs) {
+      if (seenDocs.current.has(doc.id)) continue
+      seenDocs.current.add(doc.id)
+      const path = doc.pages[0]?.source.path
+      const at = path ? lastPosition(path) : null
+      if (!at) continue
+      const index = doc.pages.findIndex((p) => p.source.path === path && p.pageIndex === at)
+      if (index > 0) {
+        setResume({ docId: doc.id, pageId: doc.pages[index].id, name: doc.name, number: index + 1 })
+      }
+    }
+    setResume((r) => (r && !collection.docs.some((d) => d.id === r.docId) ? null : r))
+  }, [collection.docs])
   const docs = collection.docs
 
   const searchIndex = useSearchIndex(docs, elementState.elements)
@@ -280,8 +335,25 @@ export function WorkspaceView({
             }
       )
     }
+    if (resume) {
+      list.push({
+        id: `resume:${resume.docId}`,
+        text: `"${resume.name}": continue reading at page ${resume.number}?`,
+        actions: [
+          {
+            label: `Open page ${resume.number}`,
+            primary: true,
+            onClick: () => {
+              setResume(null)
+              openPageRef.current(resume.docId, resume.pageId)
+            }
+          },
+          { label: 'No', onClick: () => setResume(null) }
+        ]
+      })
+    }
     return list
-  }, [missing, sourceWatch, relink])
+  }, [missing, sourceWatch, relink, resume])
 
   const { exportCollection, exportPages, exportZip, buildPagesPdf, hasEdits } = useExport(
     docs,
@@ -348,6 +420,14 @@ export function WorkspaceView({
     [annotateCopy, copyPageToDoc]
   )
 
+  const { copyGroupInto: copyGroupIntoDoc, copyGroupToNewDoc: copyGroupToDoc } = collection
+  const annotateCopies = useCallback(
+    (origins: Map<string, string>) => {
+      copyMarksFrom(origins)
+      copyElementsFrom(origins)
+    },
+    [copyMarksFrom, copyElementsFrom]
+  )
   const drag = useDragController({
     layout,
     canvasRef,
@@ -355,8 +435,28 @@ export function WorkspaceView({
     movePageToNewDoc: collection.movePageToNewDoc,
     copyPageInto,
     copyPageToNewDoc,
+    moveGroupInto: collection.moveGroupInto,
+    moveGroupToNewDoc: collection.moveGroupToNewDoc,
+    copyGroupInto: (refs, docId, index) => annotateCopies(copyGroupIntoDoc(refs, docId, index)),
+    copyGroupToNewDoc: (refs, grabbed, docIndex) =>
+      annotateCopies(copyGroupToDoc(refs, grabbed, docIndex)),
     onExternalDrop: handleExternalDropFiles
   })
+
+  // A page dragged from inside a selection of several takes them all along;
+  // returns how many travel (for the drag picture).
+  const { startPageDrag: beginDrag } = drag
+  const { currentSelection: selectionNow } = collection
+  const startPageDrag = useCallback(
+    (docId: string, pageId: string): number => {
+      const selection = selectionNow()
+      const group =
+        selection.length > 1 && selection.some((r) => r.pageId === pageId) ? selection : undefined
+      beginDrag(docId, pageId, group)
+      return group?.length ?? 1
+    },
+    [beginDrag, selectionNow]
+  )
 
   const onPaste = useCallback(() => void handlePaste(), [handlePaste])
   const { undo: popUndo, redo: popRedo } = undoStack
@@ -757,7 +857,8 @@ export function WorkspaceView({
             onHoverDoc={onHoverDoc}
             onDocDragOut={startDocDragOut}
             onOpenPage={fullViewState.openPage}
-            onPageDragStart={drag.startPageDrag}
+            onPageDragStart={startPageDrag}
+            draggingGroup={drag.draggingGroup}
             onPageDragEnd={drag.clearDrag}
             onAddPage={addPagesToDoc}
             onMoveDoc={collection.moveDoc}

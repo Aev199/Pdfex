@@ -30,6 +30,7 @@ export function createWebApi(): PdfxApi {
       previousVersion: null
     }),
     openDataFolder: async () => '',
+    openDefaultApps: async () => {},
     updateState: async () => ({
       phase: { kind: 'idle' },
       dialog: false,
@@ -43,9 +44,15 @@ export function createWebApi(): PdfxApi {
     readClipboardImage,
     readClipboardFiles: async () => [],
     clearClipboard,
+    pasteText: async () => {
+      document.execCommand('paste')
+    },
     getPathForFile: () => '',
     expandDropPaths: async () => [],
     readSource: async () => null,
+    decryptPdf: async () => {
+      throw new Error('Encrypted PDFs are exported by the desktop app only')
+    },
     officeConverter: async () => null,
     officeConvert: async () => {
       throw new Error('Office conversion needs the desktop app')

@@ -1,6 +1,7 @@
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, CommentIcon } from '../icons'
 import { isMac } from './geometry'
 import type { EditTool } from '../../edit/types'
+import type { ReaderLayout } from './continuous/layout'
 import { useEffect, useState } from 'react'
 
 interface FullViewChromeProps {
@@ -26,6 +27,10 @@ interface FullViewChromeProps {
   editBlocked: string | null
   navByKey: (axis: 'x' | 'y', dir: 1 | -1) => void
   onRotate: (delta: 90 | -90) => void
+  layout: ReaderLayout
+  // Editing shows pages one at a time.
+  layoutLocked: boolean
+  onLayout: (layout: ReaderLayout) => void
   commentsOpen: boolean
   // Open comments of the document.
   commentCount: number
@@ -53,6 +58,9 @@ export function FullViewChrome({
   editBlocked,
   navByKey,
   onRotate,
+  layout,
+  layoutLocked,
+  onLayout,
   commentsOpen,
   commentCount,
   onToggleComments
@@ -69,6 +77,33 @@ export function FullViewChrome({
           <SidebarIcon />
         </button>
         <span className="full-title">{docName}</span>
+        <div
+          className="reader-layouts"
+          role="radiogroup"
+          aria-label="Page layout"
+          title={layoutLocked ? 'Pages are shown one at a time while editing' : undefined}
+        >
+          {(
+            [
+              ['page', 'One page at a time'],
+              ['scroll', 'Scroll, fitted to the width'],
+              ['spread', 'Two pages side by side']
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              className={layout === key ? 'on' : ''}
+              role="radio"
+              aria-checked={layout === key}
+              aria-label={label}
+              title={layoutLocked ? undefined : label}
+              disabled={layoutLocked}
+              onClick={() => onLayout(key)}
+            >
+              <LayoutIcon layout={key} />
+            </button>
+          ))}
+        </div>
         <div className="full-actions">
           {editing ? (
             <>
@@ -173,6 +208,33 @@ export function FullViewChrome({
 
       <PageJump pi={pi} pageCount={pageCount} onGo={goToPage} />
     </div>
+  )
+}
+
+function LayoutIcon({ layout }: { layout: ReaderLayout }): React.JSX.Element {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+    >
+      {layout === 'page' && <rect x="4" y="2" width="8" height="12" rx="1" />}
+      {layout === 'scroll' && (
+        <>
+          <rect x="3" y="1" width="10" height="7" rx="1" />
+          <rect x="3" y="10" width="10" height="7" rx="1" />
+        </>
+      )}
+      {layout === 'spread' && (
+        <>
+          <rect x="1.5" y="3" width="6" height="10" rx="1" />
+          <rect x="8.5" y="3" width="6" height="10" rx="1" />
+        </>
+      )}
+    </svg>
   )
 }
 

@@ -38,7 +38,7 @@ interface PageCellProps {
   onSelectPage: (docId: string, pageId: string, modifiers?: SelectModifiers) => void
   onPageContextMenu: (docId: string, pageId: string, x: number, y: number) => void
   onOpenPage: (docId: string, pageId: string) => void
-  onPageDragStart: (docId: string, pageId: string) => void
+  onPageDragStart: (docId: string, pageId: string) => number | void
   onPageDragEnd: () => void
 }
 
@@ -117,10 +117,10 @@ function PageCellImpl({
         e.dataTransfer.effectAllowed = 'copyMove'
         const el = e.currentTarget as HTMLElement
         const rect = el.getBoundingClientRect()
-        const img = buildPageDragImage(el, rect)
+        const count = onPageDragStart(docId, page.id) ?? 1
+        const img = buildPageDragImage(el, rect, count)
         e.dataTransfer.setDragImage(img, e.clientX - rect.left, e.clientY - rect.top)
         window.setTimeout(() => img.remove(), 0)
-        onPageDragStart(docId, page.id)
       }}
       onDragEnd={onPageDragEnd}
     >

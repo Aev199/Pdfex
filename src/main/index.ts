@@ -1,4 +1,6 @@
 import { app, dialog, nativeTheme, BrowserWindow } from 'electron'
+import { onRecentChanged } from './recent'
+import { initFileAssociation } from './file-association'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -73,8 +75,10 @@ if (!gotLock) {
     )
 
     buildMenu()
+    onRecentChanged(buildMenu)
     createWindow()
     void initUpdater(dataLocation.kind === 'portable')
+    initFileAssociation()
 
     if (dataLocation.kind === 'fallback') {
       void dialog.showMessageBox({

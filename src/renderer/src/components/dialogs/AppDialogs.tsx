@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AboutDialog } from './AboutDialog'
 import { HelpDialog } from './HelpDialog'
+import { PasswordDialog } from './PasswordDialog'
 import { SettingsDialog } from './SettingsDialog'
 import { UpdateBadge, UpdateDialog } from './UpdateDialog'
 import { GearIcon, HelpIcon } from '../icons'
@@ -60,6 +61,7 @@ export function useAppDialogs(): { trailing: React.ReactNode; dialogs: React.Rea
         <HelpDialog topic={open === 'help' ? 'guide' : 'shortcuts'} onClose={close} />
       )}
       <UpdateDialog state={updates} version={version} />
+      <PasswordDialog />
     </>
   )
   return { trailing, dialogs }

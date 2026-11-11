@@ -1,4 +1,5 @@
-import { getDocument } from 'pdfjs-dist'
+import { getDocument, PasswordResponses } from 'pdfjs-dist'
+import { askPassword, PasswordCancelled } from '../app/password-prompt'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { partitionPages, readManifest, stripExtension } from './format'
 import { findConverter } from './convert'
@@ -33,6 +34,8 @@ export interface SourceMeta {
   pristine?: boolean
   // Reuse a stored id (session restore).
   id?: string
+  // What to call the file when asking for its password.
+  name?: string
   // Called as soon as the page count is known, before page sizes are read.
   onPageCount?: (count: number) => void
 }
@@ -44,11 +47,30 @@ export const fileMeta = (
 ): SourceMeta => ({ path: file.path, mtimeMs: file.mtimeMs, pristine: !converted })
 
 export async function loadSource(bytes: Uint8Array, meta?: SourceMeta): Promise<LoadedSource> {
-  const pdf = await getDocument({
+  const task = getDocument({
     data: bytes.slice(),
     wasmUrl: WASM_URL,
     standardFontDataUrl: STANDARD_FONT_URL
-  }).promise
+  })
+  const name = meta?.name ?? meta?.path?.split(/[\\/]/).pop() ?? 'This PDF'
+  let typed: string | undefined
+  let cancelled = false
+  task.onPassword = (update: (password: string) => void, reason: number) => {
+    void askPassword(name, reason === PasswordResponses.INCORRECT_PASSWORD).then((password) => {
+      if (password === null) {
+        cancelled = true
+        void task.destroy()
+      } else {
+        typed = password
+        update(password)
+      }
+    })
+  }
+  const pdf = await task.promise.catch((error: unknown) => {
+    throw cancelled ? new PasswordCancelled(name) : error
+  })
+  const { info } = await pdf.getMetadata().catch(() => ({ info: {} }))
+  const encrypted = !!(info as { EncryptFilterName?: string | null }).EncryptFilterName
   if (pdf.numPages > MAX_PAGES) {
     throw new Error(`PDF declares ${pdf.numPages} pages; refusing to load more than ${MAX_PAGES}`)
   }
@@ -61,7 +83,8 @@ export async function loadSource(bytes: Uint8Array, meta?: SourceMeta): Promise<
     pdf,
     path: meta?.path,
     mtimeMs: meta?.mtimeMs,
-    pristine: meta?.pristine
+    pristine: meta?.pristine,
+    password: encrypted ? (typed ?? '') : undefined
   }
   registerSource(source)
   const sizes: PageSize[] = []
@@ -98,7 +121,7 @@ const bytesCache = new Map<string, { promise: Promise<Uint8Array>; timer: number
 // Reads are cached briefly so an export touching 400 pages of one file reads
 // it once.
 export function sourceBytes(source: PdfSource): Promise<Uint8Array> {
-  if (source.bytes) return Promise.resolve(source.bytes)
+  if (source.bytes && source.password === undefined) return Promise.resolve(source.bytes)
   const cached = bytesCache.get(source.id)
   if (cached) {
     window.clearTimeout(cached.timer)
@@ -119,6 +142,13 @@ export function sourceBytes(source: PdfSource): Promise<Uint8Array> {
 }
 
 async function readFromDisk(source: PdfSource): Promise<Uint8Array> {
+  const raw = await readRaw(source)
+  // pdf-lib copies pages of encrypted files as noise: hand it a plain copy.
+  return source.password === undefined ? raw : window.api.decryptPdf(raw, source.password)
+}
+
+async function readRaw(source: PdfSource): Promise<Uint8Array> {
+  if (source.bytes) return source.bytes
   const path = source.path
   if (!path) throw new SourceUnavailableError('The document data is no longer available')
   const read = await window.api.readSource(path)

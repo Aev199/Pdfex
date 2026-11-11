@@ -1,4 +1,4 @@
-import { PDFDocument, degrees } from 'pdf-lib'
+import { PDFDocument, PDFRef, degrees } from 'pdf-lib'
 import type { PDFPage } from 'pdf-lib'
 
 import { MANIFEST_NAME, PDFX_VERSION } from './format'
@@ -8,7 +8,9 @@ import { embedElementFonts, fontFor, textRunsOf } from './elements/fonts'
 import type { TextLook } from '../elements/types'
 import type { ElementFonts } from './elements/fonts'
 import { registerAcroForm } from './form-fields'
-import { addCommentAnnotations } from './comments'
+import { addCommentAnnotations, annotationId } from './comments'
+import { writeLayers } from './layers-export'
+import { addEditableAnnotations } from './annotations-export'
 import { drawOcrText, ocrText } from './ocr-layer'
 import type { ExportDocument, ExportPage, PdfxManifest, RasterExportPage } from './format'
 
@@ -50,7 +52,11 @@ async function addExportPage(ctx: BuildContext, page: ExportPage): Promise<void>
   const fonts = await elementFonts(ctx, page)
   if (page.kind === 'raster') {
     const added = await addRasterPage(ctx.output, page)
-    drawElements(added, page.elements, fonts)
+    if (page.editableBy) {
+      addEditableAnnotations(ctx.output, added, undefined, page.elements, fonts, page.editableBy)
+    } else {
+      drawElements(added, page.elements, fonts)
+    }
     addCommentAnnotations(ctx.output, added, page.comments)
     turn(added, page.rotation)
     return
@@ -62,13 +68,42 @@ async function addExportPage(ctx: BuildContext, page: ExportPage): Promise<void>
   }
   const [copied] = await ctx.output.copyPages(source, [page.pageIndex])
   ctx.output.addPage(copied)
+  const annotations = copiedAnnotations(source, page.pageIndex, copied)
   if (fonts && page.ocrWords?.length) {
     drawOcrText(copied, page.ocrWords, fontFor(fonts, ocrText(page.ocrWords), OCR_LOOK))
   }
-  drawElements(copied, page.elements, fonts)
-  drawMarks(copied, page.marks)
-  addCommentAnnotations(ctx.output, copied, page.comments)
+  if (page.editableBy) {
+    // Hidden text stays burned in; everything else becomes annotations.
+    drawMarks(
+      copied,
+      page.marks?.filter((m) => m.kind === 'redact')
+    )
+    addEditableAnnotations(ctx.output, copied, page.marks, page.elements, fonts, page.editableBy)
+  } else {
+    drawElements(copied, page.elements, fonts)
+    drawMarks(copied, page.marks)
+  }
+  addCommentAnnotations(ctx.output, copied, page.comments, annotations)
   turn(copied, page.rotation)
+}
+
+// The page's annotations in the output, by their id in the source file
+// (copying keeps their order).
+function copiedAnnotations(
+  source: PDFDocument,
+  index: number,
+  copied: PDFPage
+): Map<string, PDFRef> {
+  const map = new Map<string, PDFRef>()
+  const from = source.getPage(index).node.Annots()
+  const to = copied.node.Annots()
+  if (!from || !to || from.size() !== to.size()) return map
+  for (let i = 0; i < from.size(); i++) {
+    const a = from.get(i)
+    const b = to.get(i)
+    if (a instanceof PDFRef && b instanceof PDFRef) map.set(annotationId(a), b)
+  }
+  return map
 }
 
 // Marks and elements are drawn in the page's own orientation first, then the
@@ -78,12 +113,16 @@ function turn(page: PDFPage, extra: number | undefined): void {
   page.setRotation(degrees((page.getRotation().angle + extra) % 360))
 }
 
+const hiddenOf = (pages: ExportPage[]): Set<string> =>
+  new Set(pages.flatMap((p) => (p.kind === 'source' ? (p.hiddenLayers ?? []) : [])))
+
 export async function buildPdf(pages: ExportPage[]): Promise<Uint8Array> {
   const output = await PDFDocument.create()
   const ctx = createContext(output)
   for (const page of pages) {
     await addExportPage(ctx, page)
   }
+  writeLayers(output, hiddenOf(pages))
   await registerAcroForm(output)
   output.setProducer(`PDFX ${PDFX_VERSION}`)
   return output.save()
@@ -101,6 +140,7 @@ export async function buildPdfx(documents: ExportDocument[], title: string): Pro
     }
     manifest.documents.push({ name: doc.name, pages: doc.pages.length })
   }
+  writeLayers(output, hiddenOf(documents.flatMap((d) => d.pages)))
 
   await registerAcroForm(output)
 
